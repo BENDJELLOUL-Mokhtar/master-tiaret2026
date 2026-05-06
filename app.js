@@ -186,7 +186,7 @@ function handleLogin(event) {
         
         // إخفاء صفحة تسجيل الدخول وإظهار المنصة
         document.getElementById('login-page').style.display = 'none';
-        document.getElementById('main-platform').style.display = 'block';
+        document.getElementById('main-platform').style.display = 'flex';
         
         // تحديث واجهة المستخدم
         updateUIForUser(currentUser);
@@ -275,7 +275,7 @@ function checkLoginStatus() {
         // المستخدم مسجل دخوله
         document.getElementById('login-page').style.display = 'none';
         document.getElementById('register-page').style.display = 'none';
-        document.getElementById('main-platform').style.display = 'block';
+        document.getElementById('main-platform').style.display = 'flex';
         updateUIForUser(user);
     } else {
         // المستخدم غير مسجل
