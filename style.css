@@ -45,6 +45,18 @@ body {
     line-height: 1.6;
 }
 
+/* منصة رئيسية - تملأ الشاشة بالكامل */
+#main-platform {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+}
+
 .container {
     max-width: 1400px;
     margin: 0 auto;
@@ -425,6 +437,7 @@ body {
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    height: 0; /* يجبر flex على حساب الارتفاع الصحيح */
 }
 
 /* ================================================
