@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منصة إدارة لجان مناقشة مذكرات الماستر - جامعة ابن خلدون تيارت</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- مكتبات خارجية -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <!-- صفحة تسجيل الدخول -->
+    <div id="login-page" class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <img src="mokhtar.png" alt="Logo" class="login-logo">
+                <h1>منصة إدارة لجان المناقشة</h1>
+                <p>جامعة ابن خلدون - تيارت</p>
+                <p class="login-subtitle">كلية الآداب واللغات - قسم اللغة العربية وآدابها</p>
+            </div>
+            <form id="login-form" onsubmit="handleLogin(event)" class="login-form">
+                <div class="form-group">
+                    <label for="username">اسم المستخدم</label>
+                    <input type="text" id="username" required placeholder="أدخل اسم المستخدم">
+                </div>
+                <div class="form-group">
+                    <label for="password">كلمة المرور</label>
+                    <input type="password" id="password" required placeholder="أدخل كلمة المرور">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">🔐 تسجيل الدخول</button>
+            </form>
+            <div class="login-footer">
+                <div class="login-switch">
+                    <p>ليس لديك حساب؟ <a href="#" onclick="showRegisterPage(); return false;">📝 إنشاء حساب جديد</a></p>
+                </div>
+                <details class="test-accounts">
+                    <summary>🔑 حسابات تجريبية</summary>
+                    <div class="accounts-list">
+                        <div class="account-item">
+                            <strong>مدير المنصة:</strong> admin / admin123
+                        </div>
+                        <div class="account-item">
+                            <strong>رئيس القسم:</strong> head / head123
+                        </div>
+                        <div class="account-item">
+                            <strong>نائب رئيس القسم:</strong> deputy / deputy123
+                        </div>
+                        <div class="account-item">
+                            <strong>رئيس الميدان:</strong> field_head / field123
+                        </div>
+                        <hr style="margin: 10px 0; border: none; border-top: 1px solid var(--gray-300);">
+                        <div class="account-item">
+                            <strong>رئيس شعبة الدراسات اللغوية:</strong> branch_head_1 / branch123
+                        </div>
+                        <div class="account-item">
+                            <strong>رئيس شعبة الدراسات الأدبية:</strong> branch_head_2 / branch123
+                        </div>
+                        <div class="account-item">
+                            <strong>رئيس شعبة الدراسات النقدية:</strong> branch_head_3 / branch123
+                        </div>
+                        <hr style="margin: 10px 0; border: none; border-top: 1px solid var(--gray-300);">
+                        <div class="account-item">
+                            <strong>رئيس تخصص لسانيات الخطاب:</strong> spec_head_1 / spec123
+                        </div>
+                        <div class="account-item">
+                            <strong>رئيس تخصص تعليمية اللغات:</strong> spec_head_2 / spec123
+                        </div>
+                        <div class="account-item">
+                            <strong>رئيس تخصص الأدب الحديث:</strong> spec_head_3 / spec123
+                        </div>
+                        <div class="account-item">
+                            <strong>رئيس تخصص النقد الحديث:</strong> spec_head_4 / spec123
+                        </div>
+                        <hr style="margin: 10px 0; border: none; border-top: 1px solid var(--gray-300);">
+                        <div class="account-item">
+                            <strong>أستاذ:</strong> professor / prof123
+                        </div>
+                        <div class="account-item">
+                            <strong>طالب:</strong> student / student123
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- صفحة التسجيل -->
+    <div id="register-page" class="login-container" style="display: none;">
+        <div class="login-box register-box">
+            <div class="login-header">
+                <img src="mokhtar.png" alt="Logo" class="login-logo">
+                <h1>إنشاء حساب جديد</h1>
+                <p>جامعة ابن خلدون - تيارت</p>
+                <p class="login-subtitle">كلية الآداب واللغات - قسم اللغة العربية وآدابها</p>
+            </div>
+            <form id="register-form" onsubmit="handleRegister(event)" class="login-form">
+                <div class="form-group">
+                    <label for="reg-fullname">الاسم الكامل *</label>
+                    <input type="text" id="reg-fullname" required placeholder="اللقب والاسم (مثال: بن محمد أحمد)">
+                    <small class="form-hint">⚠️ يجب كتابة اللقب والاسم بينهما فراغ واحد</small>
+                </div>
+                <div class="form-group">
+                    <label for="reg-role">الصفة *</label>
+                    <select id="reg-role" required onchange="updateRegisterFields()">
+                        <option value="">-- اختر الصفة --</option>
+                        <option value="professor">أستاذ</option>
+                        <option value="student">طالب</option>
+                    </select>
+                </div>
+                <div class="form-group" id="reg-title-group" style="display: none;">
+                    <label for="reg-title">الرتبة العلمية *</label>
+                    <select id="reg-title">
+                        <option value="">-- اختر الرتبة --</option>
+                        <option value="أستاذ التعليم العالي">أستاذ التعليم العالي</option>
+                        <option value="أستاذ محاضر أ">أستاذ محاضر أ</option>
+                        <option value="أستاذ محاضر ب">أستاذ محاضر ب</option>
+                        <option value="أستاذ مساعد أ">أستاذ مساعد أ</option>
+                        <option value="أستاذ مساعد ب">أستاذ مساعد ب</option>
+                    </select>
+                </div>
+                <div class="form-group" id="reg-student-info" style="display: none;">
+                    <label for="reg-student-id">رقم التسجيل (اختياري)</label>
+                    <input type="text" id="reg-student-id" placeholder="مثال: M2026001">
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">كلمة المرور *</label>
+                    <input type="password" id="reg-password" required placeholder="أدخل كلمة المرور" minlength="6">
+                    <small class="form-hint">⚠️ يجب أن تكون 6 أحرف على الأقل</small>
+                </div>
+                <div class="form-group">
+                    <label for="reg-password-confirm">تأكيد كلمة المرور *</label>
+                    <input type="password" id="reg-password-confirm" required placeholder="أعد إدخال كلمة المرور">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">✅ إنشاء الحساب</button>
+            </form>
+            <div class="login-footer">
+                <div class="login-switch">
+                    <p>لديك حساب بالفعل؟ <a href="#" onclick="showLoginPage(); return false;">🔐 تسجيل الدخول</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- المنصة الرئيسية -->
+    <div id="main-platform" style="display: none;">
+    <!-- الشريط العلوي -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>منصة إدارة لجان المناقشة</h1>
+                    <p>كلية الآداب واللغات - قسم اللغة العربية وآدابها</p>
+                    <p class="university">جامعة ابن خلدون - تيارت</p>
+                </div>
+                <div class="designer-info">
+                    <img src="mokhtar.png" alt="أ.د بن جلول مختار" class="designer-photo">
+                    <div class="designer-details">
+                        <h3 class="designer-name">أ.د بن جلول مختار</h3>
+                        <p class="designer-title">أستاذ اللسانيات العربية</p>
+                        <p class="designer-lab">مخبر الدراسات النحوية واللغوية<br>بين التراث والحداثة في الجزائر</p>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div class="user-info">
+                        <span class="user-name" id="current-user-name"></span>
+                        <span class="user-role" id="current-user-role"></span>
+                    </div>
+                    <button onclick="importExcel()" class="btn btn-secondary">📥 استيراد</button>
+                    <button onclick="exportToExcel()" class="btn btn-primary">📤 تصدير</button>
+                    <button onclick="handleLogout()" class="btn btn-danger">🚪 خروج</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- الشريط الجانبي -->
+        <aside class="sidebar">
+            <nav class="sidebar-nav">
+                <a href="#" onclick="showPage('dashboard')" class="nav-item active" data-page="dashboard">
+                    <span class="icon">📊</span>
+                    <span>لوحة التحكم</span>
+                </a>
+                <a href="#" onclick="showPage('theses-list')" class="nav-item" data-page="theses-list">
+                    <span class="icon">📚</span>
+                    <span>قائمة المذكرات</span>
+                </a>
+                <a href="#" onclick="showPage('add-thesis')" class="nav-item" data-page="add-thesis">
+                    <span class="icon">➕</span>
+                    <span>إضافة مذكرة</span>
+                </a>
+                <a href="#" onclick="showPage('professors')" class="nav-item" data-page="professors">
+                    <span class="icon">👨‍🏫</span>
+                    <span>الأساتذة</span>
+                </a>
+                <a href="#" onclick="showPage('statistics')" class="nav-item" data-page="statistics">
+                    <span class="icon">📈</span>
+                    <span>الإحصائيات</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- المحتوى الرئيسي -->
+        <main class="content">
+            <!-- صفحة لوحة التحكم -->
+            <div id="dashboard" class="page active">
+                <div class="page-header">
+                    <h2>لوحة التحكم</h2>
+                    <p class="subtitle">الموسم الجامعي: 2025/2026</p>
+                </div>
+
+                <!-- البطاقات الإحصائية -->
+                <div class="stats-grid">
+                    <div class="stat-card primary">
+                        <div class="stat-icon">📚</div>
+                        <div class="stat-content">
+                            <h3 id="total-theses">0</h3>
+                            <p>إجمالي المذكرات</p>
+                        </div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-icon">🎓</div>
+                        <div class="stat-content">
+                            <h3 id="specialization-1">0</h3>
+                            <p>لسانيات الخطاب</p>
+                        </div>
+                    </div>
+                    <div class="stat-card info">
+                        <div class="stat-icon">📖</div>
+                        <div class="stat-content">
+                            <h3 id="specialization-2">0</h3>
+                            <p>تعليمية اللغات</p>
+                        </div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-icon">✍️</div>
+                        <div class="stat-content">
+                            <h3 id="specialization-3">0</h3>
+                            <p>أدب حديث ومعاصر</p>
+                        </div>
+                    </div>
+                    <div class="stat-card danger">
+                        <div class="stat-icon">🎭</div>
+                        <div class="stat-content">
+                            <h3 id="specialization-4">0</h3>
+                            <p>نقد حديث ومعاصر</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- إحصائيات الشعب -->
+                <div class="branches-stats">
+                    <h3>توزيع المذكرات حسب الشعب</h3>
+                    <div class="stats-grid-3">
+                        <div class="stat-card-small">
+                            <h4 id="branch-1">0</h4>
+                            <p>دراسات لغوية</p>
+                        </div>
+                        <div class="stat-card-small">
+                            <h4 id="branch-2">0</h4>
+                            <p>دراسات أدبية</p>
+                        </div>
+                        <div class="stat-card-small">
+                            <h4 id="branch-3">0</h4>
+                            <p>دراسات نقدية</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- آخر المذكرات المضافة -->
+                <div class="recent-theses">
+                    <h3>آخر المذكرات المضافة</h3>
+                    <div id="recent-theses-table"></div>
+                </div>
+            </div>
+
+            <!-- صفحة قائمة المذكرات -->
+            <div id="theses-list" class="page">
+                <div class="page-header">
+                    <h2>قائمة المذكرات</h2>
+                    <button onclick="showPage('add-thesis')" class="btn btn-primary">➕ إضافة مذكرة جديدة</button>
+                </div>
+
+                <!-- شريط البحث والفلترة -->
+                <div class="filters-bar">
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="🔍 البحث في المذكرات (موضوع، طالب، أستاذ...)">
+                    </div>
+                    <div class="filter-group">
+                        <select id="filter-branch" onchange="applyFilters()">
+                            <option value="">كل الشعب</option>
+                            <option value="دراسات لغوية">دراسات لغوية</option>
+                            <option value="دراسات أدبية">دراسات أدبية</option>
+                            <option value="دراسات نقدية">دراسات نقدية</option>
+                        </select>
+                        <select id="filter-specialization" onchange="applyFilters()">
+                            <option value="">كل التخصصات</option>
+                            <option value="لسانيات الخطاب">لسانيات الخطاب</option>
+                            <option value="تعليمية اللغات">تعليمية اللغات</option>
+                            <option value="أدب حديث ومعاصر">أدب حديث ومعاصر</option>
+                            <option value="نقد حديث ومعاصر">نقد حديث ومعاصر</option>
+                        </select>
+                        <button onclick="clearFilters()" class="btn btn-secondary">🔄 مسح الفلتر</button>
+                    </div>
+                </div>
+
+                <!-- جدول المذكرات -->
+                <div id="theses-table-container"></div>
+
+                <!-- الترقيم -->
+                <div class="pagination" id="pagination"></div>
+            </div>
+
+            <!-- صفحة إضافة/تعديل مذكرة -->
+            <div id="add-thesis" class="page">
+                <div class="page-header">
+                    <h2 id="form-title">إضافة مذكرة جديدة</h2>
+                    <div class="header-actions" style="display: flex; gap: 10px;">
+                        <button onclick="importExcelInForm()" class="btn btn-info">📥 استيراد من Excel</button>
+                        <button onclick="showPage('theses-list')" class="btn btn-secondary">← العودة للقائمة</button>
+                    </div>
+                </div>
+
+                <!-- قسم الاستيراد السريع -->
+                <div class="import-section" style="background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); padding: 20px; border-radius: 10px; margin-bottom: 25px; border-right: 5px solid #2196F3;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="font-size: 3rem;">📂</div>
+                        <div style="flex: 1;">
+                            <h3 style="margin: 0 0 8px 0; color: #1565C0; font-size: 1.2rem;">استيراد سريع من Excel</h3>
+                            <p style="margin: 0; color: #424242; font-size: 0.95rem;">يمكنك استيراد عدة مذكرات دفعة واحدة من ملف Excel. سيتم إضافتها تلقائياً إلى قاعدة البيانات.</p>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="downloadExcelTemplate()" class="btn btn-secondary" style="padding: 12px 20px; font-size: 0.95rem;">
+                                📄 تحميل نموذج
+                            </button>
+                            <button onclick="importExcelInForm()" class="btn btn-primary" style="padding: 12px 25px; font-size: 1rem;">
+                                📥 اختر ملف Excel
+                            </button>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.1);">
+                        <small style="color: #616161;">
+                            <strong>متطلبات الملف:</strong> يجب أن يحتوي على الأعمدة: موضوع المذكرة، الطالب الأول، الشعبة، التخصص، الأستاذ المشرف، رئيس اللجنة، العضو المناقش
+                        </small>
+                    </div>
+                </div>
+
+                <div class="divider" style="text-align: center; margin: 30px 0; position: relative;">
+                    <span style="background: #F5F5F5; padding: 0 20px; position: relative; z-index: 1; color: #757575; font-weight: 600;">أو أضف مذكرة يدوياً</span>
+                    <div style="position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: #E0E0E0; z-index: 0;"></div>
+                </div>
+
+                <form id="thesis-form" class="thesis-form">
+                    <input type="hidden" id="thesis-id" value="">
+
+                    <!-- القسم 1: معلومات المذكرة -->
+                    <div class="form-section">
+                        <h3>📝 معلومات المذكرة</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="thesis-number">رقم المذكرة *</label>
+                                <input type="text" id="thesis-number" required placeholder="مثال: 11001" oninput="searchAndFillThesis()">
+                                <small>سيتم توليد رقم تلقائياً إذا تركت الحقل فارغاً</small>
+                            </div>
+                            <div class="form-group full-width">
+                                <label for="thesis-title">موضوع المذكرة *</label>
+                                <textarea id="thesis-title" rows="3" required placeholder="أدخل موضوع المذكرة كاملاً..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="branch">الشعبة *</label>
+                                <select id="branch" required onchange="updateSpecializations()">
+                                    <option value="">اختر الشعبة</option>
+                                    <option value="دراسات لغوية">دراسات لغوية</option>
+                                    <option value="دراسات أدبية">دراسات أدبية</option>
+                                    <option value="دراسات نقدية">دراسات نقدية</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="specialization">التخصص *</label>
+                                <select id="specialization" required>
+                                    <option value="">اختر التخصص</option>
+                                    <option value="لسانيات الخطاب">لسانيات الخطاب</option>
+                                    <option value="تعليمية اللغات">تعليمية اللغات</option>
+                                    <option value="أدب حديث ومعاصر">أدب حديث ومعاصر</option>
+                                    <option value="نقد حديث ومعاصر">نقد حديث ومعاصر</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- القسم 2: الطلاب -->
+                    <div class="form-section">
+                        <h3>🎓 الطالب (الطلاب)</h3>
+                        <div class="form-grid">
+                            <div class="form-group full-width">
+                                <label for="student1">اسم الطالب الأول *</label>
+                                <input type="text" id="student1" required placeholder="الاسم الكامل للطالب الأول" oninput="searchAndFillThesis()">
+                            </div>
+                            <div class="form-group full-width" id="student2-group" style="display: none;">
+                                <label for="student2">اسم الطالب الثاني</label>
+                                <input type="text" id="student2" placeholder="الاسم الكامل للطالب الثاني" oninput="searchAndFillThesis()">
+                            </div>
+                            <div class="form-group full-width">
+                                <button type="button" onclick="toggleStudent2()" class="btn btn-secondary" id="add-student-btn">
+                                    ➕ إضافة طالب ثانٍ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- القسم 3: الأستاذ المشرف -->
+                    <div class="form-section">
+                        <h3>👨‍🏫 الأستاذ المشرف</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="supervisor">اسم الأستاذ المشرف *</label>
+                                <input type="text" id="supervisor" required placeholder="أدخل اسم الأستاذ المشرف" list="professors-list">
+                            </div>
+                            <div class="form-group">
+                                <label for="supervisor-rank">الرتبة *</label>
+                                <select id="supervisor-rank" required>
+                                    <option value="">اختر الرتبة</option>
+                                    <option value="أستاذ التعليم العالي">أستاذ التعليم العالي</option>
+                                    <option value="أستاذ محاضر أ">أستاذ محاضر أ</option>
+                                    <option value="أستاذ محاضر ب">أستاذ محاضر ب</option>
+                                    <option value="أستاذ مساعد أ">أستاذ مساعد أ</option>
+                                    <option value="أستاذ مساعد ب">أستاذ مساعد ب</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- القسم 4: لجنة المناقشة -->
+                    <div class="form-section">
+                        <h3>⚖️ لجنة المناقشة</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="president">رئيس اللجنة *</label>
+                                <input type="text" id="president" required placeholder="اسم رئيس اللجنة" list="professors-list">
+                            </div>
+                            <div class="form-group">
+                                <label for="president-rank">الرتبة *</label>
+                                <select id="president-rank" required>
+                                    <option value="">اختر الرتبة</option>
+                                    <option value="أستاذ التعليم العالي">أستاذ التعليم العالي</option>
+                                    <option value="أستاذ محاضر أ">أستاذ محاضر أ</option>
+                                    <option value="أستاذ محاضر ب">أستاذ محاضر ب</option>
+                                    <option value="أستاذ مساعد أ">أستاذ مساعد أ</option>
+                                    <option value="أستاذ مساعد ب">أستاذ مساعد ب</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="examiner">العضو المناقش *</label>
+                                <input type="text" id="examiner" required placeholder="اسم العضو المناقش" list="professors-list">
+                            </div>
+                            <div class="form-group">
+                                <label for="examiner-rank">الرتبة *</label>
+                                <select id="examiner-rank" required>
+                                    <option value="">اختر الرتبة</option>
+                                    <option value="أستاذ التعليم العالي">أستاذ التعليم العالي</option>
+                                    <option value="أستاذ محاضر أ">أستاذ محاضر أ</option>
+                                    <option value="أستاذ محاضر ب">أستاذ محاضر ب</option>
+                                    <option value="أستاذ مساعد أ">أستاذ مساعد أ</option>
+                                    <option value="أستاذ مساعد ب">أستاذ مساعد ب</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- القسم 5: موعد المناقشة -->
+                    <div class="form-section">
+                        <h3>📅 موعد المناقشة</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="defense-date">تاريخ المناقشة</label>
+                                <input type="date" id="defense-date">
+                            </div>
+                            <div class="form-group">
+                                <label for="defense-time">التوقيت</label>
+                                <select id="defense-time">
+                                    <option value="">اختر التوقيت</option>
+                                    <option value="09 سا و00 د">09 سا و00 د</option>
+                                    <option value="10 سا و15 د">10 سا و15 د</option>
+                                    <option value="11 سا و30د">11 سا و30د</option>
+                                    <option value="13 سا و15 د">13 سا و15 د</option>
+                                    <option value="14 سا و30 د">14 سا و30 د</option>
+                                </select>
+                            </div>
+                            <div class="form-group full-width">
+                                <label for="room">المكان / القاعة</label>
+                                <select id="room">
+                                    <option value="">اختر القاعة</option>
+                                    <option value="مدرج الوئام">مدرج الوئام</option>
+                                    <option value="مدرج المعرفة">مدرج المعرفة</option>
+                                    <option value="مدرج المستقبل">مدرج المستقبل</option>
+                                    <option value="مدرج السلام">مدرج السلام</option>
+                                    <option value="مدرج الأمل">مدرج الأمل</option>
+                                    <option value="القاعة 01">القاعة 01</option>
+                                    <option value="القاعة 02">القاعة 02</option>
+                                    <option value="القاعة 03">القاعة 03</option>
+                                    <option value="القاعة 20">القاعة 20</option>
+                                    <option value="القاعة 21">القاعة 21</option>
+                                    <option value="القاعة 22">القاعة 22</option>
+                                    <option value="القاعة 23">القاعة 23</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- أزرار النموذج -->
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">💾 حفظ المذكرة</button>
+                        <button type="button" onclick="resetForm()" class="btn btn-secondary">🔄 إعادة تعيين</button>
+                        <button type="button" onclick="previewPDF()" class="btn btn-info">👁️ معاينة المحضر</button>
+                    </div>
+                </form>
+
+                <!-- قائمة الأساتذة للـ autocomplete -->
+                <datalist id="professors-list"></datalist>
+            </div>
+
+            <!-- صفحة الأساتذة -->
+            <div id="professors" class="page">
+                <div class="page-header">
+                    <h2>قائمة الأساتذة</h2>
+                    <p class="subtitle">عدد مرات المشاركة في لجان المناقشة</p>
+                </div>
+                <div id="professors-table-container"></div>
+            </div>
+
+            <!-- صفحة الإحصائيات -->
+            <div id="statistics" class="page">
+                <div class="page-header">
+                    <h2>الإحصائيات التفصيلية</h2>
+                    <button onclick="exportStatistics()" class="btn btn-primary">📊 تصدير الإحصائيات</button>
+                </div>
+
+                <!-- بحث عن أستاذ -->
+                <div class="professor-search-section">
+                    <div class="search-header">
+                        <h3>🔍 البحث عن مناقشات أستاذ</h3>
+                    </div>
+                    <div class="search-box">
+                        <input type="text" 
+                               id="professor-search-input" 
+                               placeholder="أدخل اسم الأستاذ للبحث عن جميع مناقشاته..."
+                               oninput="searchProfessorTheses()"
+                               class="professor-search-input">
+                        <span class="search-icon">🔎</span>
+                    </div>
+                    <div id="professor-search-results"></div>
+                </div>
+
+                <div id="statistics-table-container"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- نافذة منبثقة لمعاينة المحضر -->
+    <div id="pdf-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>محضر مناقشة المذكرة</h3>
+                <button onclick="closeModal()" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="pdf-preview"></div>
+            <div class="modal-footer">
+                <button onclick="downloadPDF()" class="btn btn-primary">📥 تحميل PDF</button>
+                <button onclick="closeModal()" class="btn btn-secondary">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة التضاربات -->
+    <div id="conflict-modal" class="modal">
+        <div class="modal-content modal-conflict">
+            <div class="modal-header">
+                <h3>🔍 تحليل التضاربات</h3>
+                <button onclick="closeConflictModal()" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="conflict-content"></div>
+        </div>
+    </div>
+
+    <!-- Toast للإشعارات -->
+    <div id="toast" class="toast"></div>
+
+    <!-- نافذة معاينة البيانات قبل الاستيراد -->
+    <div id="preview-modal" class="modal">
+        <div class="modal-content" style="max-width: 1200px;">
+            <div class="modal-header">
+                <h3>معاينة البيانات قبل الاستيراد</h3>
+                <button onclick="closePreviewModal()" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="preview-content">
+                <div class="preview-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+                    <div class="stat-card-small">
+                        <h4 id="preview-total">0</h4>
+                        <p>إجمالي المذكرات</p>
+                    </div>
+                    <div class="stat-card-small" style="background: #C8E6C9;">
+                        <h4 id="preview-valid" style="color: #2E7D32;">0</h4>
+                        <p>صحيحة وجاهزة</p>
+                    </div>
+                    <div class="stat-card-small" style="background: #FFCDD2;">
+                        <h4 id="preview-invalid" style="color: #C62828;">0</h4>
+                        <p>بها أخطاء</p>
+                    </div>
+                </div>
+                <div id="preview-table-container"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="confirmImport()" class="btn btn-primary" id="confirm-import-btn">✅ تأكيد الاستيراد</button>
+                <button onclick="closePreviewModal()" class="btn btn-secondary">إلغاء</button>
+            </div>
+        </div>
+    </div>
+    </div> <!-- نهاية المنصة الرئيسية -->
+
+    <!-- ملف البيانات والمنطق -->
+    <script src="app.js"></script>
+    <!-- ملف البيانات التجريبية (اختياري) -->
+    <script src="sample-data.js"></script>
+</body>
+</html>
