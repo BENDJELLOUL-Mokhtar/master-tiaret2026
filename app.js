@@ -738,6 +738,288 @@ function loadProfessors() {
 }
 
 // ================================================
+// نظام إدارة الأساتذة الكامل
+// ================================================
+
+const PROFESSORS_DATA_KEY = 'professors_database';
+
+// بنية بيانات الأستاذ
+function createProfessor(name, data = {}) {
+    return {
+        id: Date.now() + Math.random(),
+        name: name,
+        rank: data.rank || '', // الرتبة
+        specialization: data.specialization || '', // التخصص
+        email: data.email || '',
+        phone: data.phone || '',
+        institution: data.institution || 'جامعة ابن خلدون - تيارت',
+        notes: data.notes || '',
+        addedDate: data.addedDate || new Date().toISOString(),
+        isAutoExtracted: data.isAutoExtracted || false
+    };
+}
+
+function saveProfessorsDatabase(profs) {
+    localStorage.setItem(PROFESSORS_DATA_KEY, JSON.stringify(profs));
+}
+
+function loadProfessorsDatabase() {
+    const stored = localStorage.getItem(PROFESSORS_DATA_KEY);
+    return stored ? JSON.parse(stored) : [];
+}
+
+// استخراج الأساتذة تلقائياً من المذكرات
+function syncProfessorsFromTheses() {
+    if (!confirm('سيتم استخراج أسماء جميع الأساتذة من المذكرات وإضافتها تلقائياً.\nالأساتذة الموجودون مسبقاً لن يتأثروا.\nهل تريد المتابعة؟')) return;
+    
+    const professorsDB = loadProfessorsDatabase();
+    const existingNames = new Set(professorsDB.map(p => p.name));
+    const extractedNames = new Set();
+    
+    theses.forEach(thesis => {
+        if (thesis.supervisor) extractedNames.add(thesis.supervisor);
+        if (thesis.president) extractedNames.add(thesis.president);
+        if (thesis.examiner) extractedNames.add(thesis.examiner);
+    });
+    
+    let addedCount = 0;
+    extractedNames.forEach(name => {
+        if (!existingNames.has(name)) {
+            professorsDB.push(createProfessor(name, { isAutoExtracted: true }));
+            addedCount++;
+        }
+    });
+    
+    saveProfessorsDatabase(professorsDB);
+    updateProfessorsPage();
+    showToast(`✅ تم استخراج وإضافة ${addedCount} أستاذ جديد من المذكرات`, 'success');
+}
+
+// فتح نافذة إضافة أستاذ
+function openAddProfessorModal() {
+    const modalHtml = `
+        <div class="modal-overlay" id="add-professor-modal" onclick="if(event.target.id==='add-professor-modal')closeAddProfessorModal()">
+            <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header">
+                    <h3>➕ إضافة أستاذ جديد</h3>
+                    <button onclick="closeAddProfessorModal()" class="modal-close">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label><strong>الاسم الكامل: *</strong></label>
+                        <input type="text" id="prof-name" placeholder="مثال: د. أحمد بن محمد" required 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label><strong>الرتبة العلمية:</strong></label>
+                        <select id="prof-rank" style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                            <option value="">اختر الرتبة</option>
+                            <option value="أستاذ التعليم العالي">أستاذ التعليم العالي</option>
+                            <option value="أستاذ محاضر أ">أستاذ محاضر أ</option>
+                            <option value="أستاذ محاضر ب">أستاذ محاضر ب</option>
+                            <option value="أستاذ مساعد أ">أستاذ مساعد أ</option>
+                            <option value="أستاذ مساعد ب">أستاذ مساعد ب</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><strong>التخصص:</strong></label>
+                        <input type="text" id="prof-specialization" placeholder="مثال: لسانيات الخطاب" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label><strong>البريد الإلكتروني:</strong></label>
+                        <input type="email" id="prof-email" placeholder="professor@univ-tiaret.dz" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label><strong>رقم الهاتف:</strong></label>
+                        <input type="tel" id="prof-phone" placeholder="0555123456" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label><strong>المؤسسة:</strong></label>
+                        <input type="text" id="prof-institution" value="جامعة ابن خلدون - تيارت" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label><strong>ملاحظات:</strong></label>
+                        <textarea id="prof-notes" rows="3" placeholder="أي ملاحظات إضافية..." 
+                                  style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem; resize:vertical;"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="saveNewProfessor()" class="btn btn-success">✅ حفظ</button>
+                    <button onclick="closeAddProfessorModal()" class="btn btn-secondary">إلغاء</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.getElementById('prof-name').focus();
+}
+
+function closeAddProfessorModal() {
+    const modal = document.getElementById('add-professor-modal');
+    if (modal) modal.remove();
+}
+
+function saveNewProfessor() {
+    const name = document.getElementById('prof-name').value.trim();
+    if (!name) {
+        showToast('الرجاء إدخال اسم الأستاذ', 'error');
+        return;
+    }
+    
+    const professorsDB = loadProfessorsDatabase();
+    if (professorsDB.some(p => p.name === name)) {
+        showToast('هذا الأستاذ موجود مسبقاً', 'warning');
+        return;
+    }
+    
+    const newProf = createProfessor(name, {
+        rank: document.getElementById('prof-rank').value,
+        specialization: document.getElementById('prof-specialization').value,
+        email: document.getElementById('prof-email').value,
+        phone: document.getElementById('prof-phone').value,
+        institution: document.getElementById('prof-institution').value,
+        notes: document.getElementById('prof-notes').value
+    });
+    
+    professorsDB.push(newProf);
+    saveProfessorsDatabase(professorsDB);
+    closeAddProfessorModal();
+    updateProfessorsPage();
+    showToast('✅ تم إضافة الأستاذ بنجاح', 'success');
+}
+
+// تصدير بيانات الأساتذة
+function exportProfessorsData() {
+    const professorsDB = loadProfessorsDatabase();
+    if (professorsDB.length === 0) {
+        showToast('لا توجد بيانات لتصديرها', 'warning');
+        return;
+    }
+    
+    const json = JSON.stringify(professorsDB, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `professors_data_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`📥 تم تصدير بيانات ${professorsDB.length} أستاذ`, 'success');
+}
+
+// حذف أستاذ
+function deleteProfessor(profId) {
+    if (!confirm('هل تريد حذف هذا الأستاذ؟\nملاحظة: لن يتم حذف مشاركاته في المذكرات')) return;
+    
+    let professorsDB = loadProfessorsDatabase();
+    professorsDB = professorsDB.filter(p => p.id !== profId);
+    saveProfessorsDatabase(professorsDB);
+    updateProfessorsPage();
+    showToast('تم حذف الأستاذ', 'info');
+}
+
+// تعديل بيانات أستاذ
+function editProfessor(profId) {
+    const professorsDB = loadProfessorsDatabase();
+    const prof = professorsDB.find(p => p.id === profId);
+    if (!prof) return;
+    
+    const modalHtml = `
+        <div class="modal-overlay" id="edit-professor-modal" onclick="if(event.target.id==='edit-professor-modal')closeEditProfessorModal()">
+            <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header">
+                    <h3>✏️ تعديل بيانات الأستاذ</h3>
+                    <button onclick="closeEditProfessorModal()" class="modal-close">✕</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit-prof-id" value="${profId}">
+                    <div class="form-group">
+                        <label><strong>الاسم الكامل: *</strong></label>
+                        <input type="text" id="edit-prof-name" value="${prof.name}" required 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label><strong>الرتبة العلمية:</strong></label>
+                        <select id="edit-prof-rank" style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                            <option value="">اختر الرتبة</option>
+                            <option value="أستاذ التعليم العالي" ${prof.rank==='أستاذ التعليم العالي'?'selected':''}>أستاذ التعليم العالي</option>
+                            <option value="أستاذ محاضر أ" ${prof.rank==='أستاذ محاضر أ'?'selected':''}>أستاذ محاضر أ</option>
+                            <option value="أستاذ محاضر ب" ${prof.rank==='أستاذ محاضر ب'?'selected':''}>أستاذ محاضر ب</option>
+                            <option value="أستاذ مساعد أ" ${prof.rank==='أستاذ مساعد أ'?'selected':''}>أستاذ مساعد أ</option>
+                            <option value="أستاذ مساعد ب" ${prof.rank==='أستاذ مساعد ب'?'selected':''}>أستاذ مساعد ب</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><strong>التخصص:</strong></label>
+                        <input type="text" id="edit-prof-specialization" value="${prof.specialization}" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label><strong>البريد الإلكتروني:</strong></label>
+                        <input type="email" id="edit-prof-email" value="${prof.email}" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label><strong>رقم الهاتف:</strong></label>
+                        <input type="tel" id="edit-prof-phone" value="${prof.phone}" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label><strong>المؤسسة:</strong></label>
+                        <input type="text" id="edit-prof-institution" value="${prof.institution}" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label><strong>ملاحظات:</strong></label>
+                        <textarea id="edit-prof-notes" rows="3" 
+                                  style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem; resize:vertical;">${prof.notes}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="saveEditedProfessor()" class="btn btn-success">✅ حفظ التعديلات</button>
+                    <button onclick="closeEditProfessorModal()" class="btn btn-secondary">إلغاء</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeEditProfessorModal() {
+    const modal = document.getElementById('edit-professor-modal');
+    if (modal) modal.remove();
+}
+
+function saveEditedProfessor() {
+    const profId = parseFloat(document.getElementById('edit-prof-id').value);
+    const name = document.getElementById('edit-prof-name').value.trim();
+    
+    if (!name) {
+        showToast('الرجاء إدخال اسم الأستاذ', 'error');
+        return;
+    }
+    
+    const professorsDB = loadProfessorsDatabase();
+    const prof = professorsDB.find(p => p.id === profId);
+    if (!prof) return;
+    
+    prof.name = name;
+    prof.rank = document.getElementById('edit-prof-rank').value;
+    prof.specialization = document.getElementById('edit-prof-specialization').value;
+    prof.email = document.getElementById('edit-prof-email').value;
+    prof.phone = document.getElementById('edit-prof-phone').value;
+    prof.institution = document.getElementById('edit-prof-institution').value;
+    prof.notes = document.getElementById('edit-prof-notes').value;
+    
+    saveProfessorsDatabase(professorsDB);
+    closeEditProfessorModal();
+    updateProfessorsPage();
+    showToast('✅ تم تحديث بيانات الأستاذ', 'success');
+}
+
+// ================================================
 // التنقل بين الصفحات
 // ================================================
 
@@ -1962,30 +2244,80 @@ function fillThesisData(thesis) {
 
 function updateProfessorsPage() {
     const container = document.getElementById('professors-table-container');
-    const professors = getProfessorsStats();
+    const cardsEl = document.getElementById('professors-summary-cards');
+    const professorsDB = loadProfessorsDatabase();
+    const profStats = getProfessorsStats();
+    
+    // بطاقات الملخص
+    if (cardsEl) {
+        const totalParticipations = profStats.reduce((sum, p) => sum + p.total, 0);
+        cardsEl.innerHTML = `
+            <div class="stat-card primary">
+                <div class="stat-icon">👨‍🏫</div>
+                <div class="stat-content"><h3>${professorsDB.length}</h3><p>إجمالي الأساتذة</p></div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content"><h3>${profStats.length}</h3><p>لديهم مشاركات</p></div>
+            </div>
+            <div class="stat-card info">
+                <div class="stat-icon">🎖️</div>
+                <div class="stat-content"><h3>${totalParticipations}</h3><p>إجمالي المشاركات</p></div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-icon">🏆</div>
+                <div class="stat-content"><h3 style="font-size:0.95rem">${profStats[0]?.name || '-'}</h3><p>الأكثر مشاركة</p></div>
+            </div>
+        `;
+    }
 
-    if (professors.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👨‍🏫</div><h3>لا يوجد أساتذة</h3><p>سيظهر الأساتذة تلقائياً بعد إضافة المذكرات</p></div>';
+    if (professorsDB.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">👨‍🏫</div>
+                <h3>لا يوجد أساتذة مسجلون</h3>
+                <p>يمكنك إضافة أساتذة يدوياً أو استخراجهم تلقائياً من المذكرات</p>
+                <button onclick="syncProfessorsFromTheses()" class="btn btn-primary">🔄 استخراج من المذكرات</button>
+            </div>`;
         return;
     }
 
-    let html = '<div class="table-container"><table>';
-    html += '<thead><tr>';
-    html += '<th>الاسم</th>';
-    html += '<th>عدد الإشرافات</th>';
-    html += '<th>رئاسات الجلسات</th>';
-    html += '<th>عضويات المناقشة</th>';
-    html += '<th>المجموع</th>';
-    html += '</tr></thead><tbody>';
+    // دمج البيانات: من قاعدة البيانات + من الإحصائيات
+    const mergedData = professorsDB.map(prof => {
+        const stats = profStats.find(s => s.name === prof.name) || { supervisions: 0, presidencies: 0, examinations: 0, total: 0 };
+        return { ...prof, ...stats };
+    }).sort((a, b) => b.total - a.total);
 
-    professors.forEach(prof => {
-        html += '<tr>';
-        html += `<td><strong>${prof.name}</strong></td>`;
-        html += `<td>${prof.supervisions}</td>`;
-        html += `<td>${prof.presidencies}</td>`;
-        html += `<td>${prof.examinations}</td>`;
-        html += `<td><strong>${prof.total}</strong></td>`;
-        html += '</tr>';
+    let html = '<div class="table-container"><table class="professors-table">';
+    html += `<thead><tr>
+                <th>الاسم</th>
+                <th>الرتبة</th>
+                <th>التخصص</th>
+                <th>الإشرافات</th>
+                <th>الرئاسات</th>
+                <th>العضويات</th>
+                <th>المجموع</th>
+                <th>الإجراءات</th>
+            </tr></thead><tbody>`;
+
+    mergedData.forEach(prof => {
+        const autoTag = prof.isAutoExtracted ? '<span class="badge badge-info" style="font-size:0.7rem">تلقائي</span>' : '';
+        html += `<tr>
+            <td>
+                <strong>${prof.name}</strong> ${autoTag}
+                ${prof.email ? `<br><small style="color:#666">📧 ${prof.email}</small>` : ''}
+            </td>
+            <td>${prof.rank || '-'}</td>
+            <td>${prof.specialization || '-'}</td>
+            <td>${prof.supervisions}</td>
+            <td>${prof.presidencies}</td>
+            <td>${prof.examinations}</td>
+            <td><strong>${prof.total}</strong></td>
+            <td>
+                <button onclick="editProfessor(${prof.id})" class="btn-icon" title="تعديل">✏️</button>
+                <button onclick="deleteProfessor(${prof.id})" class="btn-icon" title="حذف" style="color:#f44336">🗑️</button>
+            </td>
+        </tr>`;
     });
 
     html += '</tbody></table></div>';
@@ -3981,6 +4313,7 @@ function findBestSlot(thesis, availableDates, rooms, constraints, roomOcc, profO
                 else score -= Math.min(diff, 10);
             }
         }
+
         return { date, score };
     }).sort((a, b) => b.score - a.score);
 
@@ -4061,6 +4394,17 @@ window.schedNext            = schedNext;
 window.schedPrev            = schedPrev;
 window.updateSchedSummary   = updateSchedSummary;
 window.applySchedulingResults = applySchedulingResults;
+
+// دوال إدارة الأساتذة
+window.syncProfessorsFromTheses = syncProfessorsFromTheses;
+window.openAddProfessorModal = openAddProfessorModal;
+window.closeAddProfessorModal = closeAddProfessorModal;
+window.saveNewProfessor = saveNewProfessor;
+window.exportProfessorsData = exportProfessorsData;
+window.deleteProfessor = deleteProfessor;
+window.editProfessor = editProfessor;
+window.closeEditProfessorModal = closeEditProfessorModal;
+window.saveEditedProfessor = saveEditedProfessor;
 
 window.toggleFilterPanel = toggleFilterPanel;
 window.onFilterChange = onFilterChange;

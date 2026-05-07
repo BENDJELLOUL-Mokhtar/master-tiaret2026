@@ -644,9 +644,19 @@
             <!-- صفحة الأساتذة -->
             <div id="professors" class="page">
                 <div class="page-header">
-                    <h2>قائمة الأساتذة</h2>
-                    <p class="subtitle">عدد مرات المشاركة في لجان المناقشة</p>
+                    <h2>📚 إدارة الأساتذة</h2>
+                    <p class="subtitle">قاعدة بيانات الأساتذة ومشاركاتهم في لجان المناقشة</p>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button onclick="openAddProfessorModal()" class="btn btn-primary">➕ إضافة أستاذ جديد</button>
+                        <button onclick="syncProfessorsFromTheses()" class="btn btn-secondary">🔄 استخراج الأساتذة من المذكرات</button>
+                        <button onclick="exportProfessorsData()" class="btn btn-info">📥 تصدير البيانات</button>
+                    </div>
                 </div>
+
+                <!-- بطاقات الملخص -->
+                <div id="professors-summary-cards" class="stats-grid" style="margin-bottom: 24px;"></div>
+
+                <!-- جدول الأساتذة -->
                 <div id="professors-table-container"></div>
             </div>
 
