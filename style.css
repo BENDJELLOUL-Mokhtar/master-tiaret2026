@@ -626,6 +626,25 @@ body {
 }
 .btn-excel-template:hover { transform: scale(1.05); filter: brightness(1.12); }
 
+/* زر صفحة إنشاء ملف Excel النموذجي */
+.btn-sample-excel {
+    background: linear-gradient(135deg, #6A1B9A, #8E24AA) !important;
+    border: 2px solid #4A148C !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    padding: 10px 22px !important;
+    border-radius: 8px !important;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: transform 0.15s, filter 0.15s;
+    font-family: 'Cairo', sans-serif;
+}
+.btn-sample-excel:hover { transform: scale(1.05); filter: brightness(1.12); color: white; }
+
 /* زر استيراد Excel في لوحة التحكم */
 .btn-import-excel {
     background: linear-gradient(135deg, #1565C0, #1976D2) !important;

@@ -401,6 +401,10 @@ function updateUIForUser(user) {
     if (dlTemplateBtn) {
         dlTemplateBtn.style.display = hasPermission('import') ? 'inline-flex' : 'none';
     }
+    const sampleExcelBtn = document.getElementById('sample-excel-btn');
+    if (sampleExcelBtn) {
+        sampleExcelBtn.style.display = hasPermission('import') ? 'inline-flex' : 'none';
+    }
 
     // إخفاء أزرار الاستيراد والتصدير حسب الصلاحيات
     const importBtn = document.querySelector('button[onclick="importExcel()"]');
