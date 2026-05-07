@@ -516,6 +516,35 @@ body {
     margin-bottom: 30px;
     padding-bottom: 15px;
     border-bottom: 2px solid var(--gray-300);
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.delete-all-btn {
+    background: var(--danger-color) !important;
+    border: 2px solid #b71c1c !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    padding: 10px 20px !important;
+    border-radius: 8px !important;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    animation: pulse-danger 2s infinite;
+    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7);
+}
+
+@keyframes pulse-danger {
+    0%   { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); }
+    70%  { box-shadow: 0 0 0 10px rgba(244, 67, 54, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+}
+
+.delete-all-btn:hover {
+    background: #b71c1c !important;
+    transform: scale(1.05);
 }
 
 .page-header h2 {

@@ -246,6 +246,12 @@ function updateUIForUser(user) {
         }
     });
     
+    // إظهار/إخفاء زر حذف كل المذكرات
+    const deleteAllBtn = document.getElementById('delete-all-btn');
+    if (deleteAllBtn) {
+        deleteAllBtn.style.display = hasPermission('delete') ? 'inline-flex' : 'none';
+    }
+
     // إخفاء أزرار الاستيراد والتصدير حسب الصلاحيات
     const importBtn = document.querySelector('button[onclick="importExcel()"]');
     const exportBtn = document.querySelector('button[onclick="exportToExcel()"]');
@@ -1321,6 +1327,35 @@ function deleteThesis(thesisId) {
     saveData();
     showToast('تم حذف المذكرة بنجاح', 'success');
     applyFilters(); // تحديث قائمة المذكرات المفلترة
+    updateDashboard();
+}
+
+function deleteAllTheses() {
+    if (!hasPermission('delete')) {
+        showToast('ليس لديك صلاحية الحذف', 'error');
+        return;
+    }
+
+    const count = theses.length;
+    if (count === 0) {
+        showToast('لا توجد مذكرات لحذفها', 'warning');
+        return;
+    }
+
+    // التأكيد الأول
+    if (!confirm(`⚠️ تحذير: سيتم حذف جميع المذكرات (${count} مذكرة)\n\nهل أنت متأكد من المتابعة؟`)) {
+        return;
+    }
+
+    // التأكيد الثاني - تحذير نهائي
+    if (!confirm(`❌ تحذير نهائي!\n\nسيتم حذف ${count} مذكرة نهائياً ولا يمكن التراجع عن هذا الإجراء.\n\nهل تريد حذف كل شيء؟`)) {
+        return;
+    }
+
+    theses = [];
+    saveData();
+    showToast(`تم حذف جميع المذكرات (${count}) بنجاح`, 'success');
+    applyFilters();
     updateDashboard();
 }
 
@@ -2856,3 +2891,4 @@ window.confirmImport = confirmImport;
 window.exportToExcel = exportToExcel;
 window.exportStatistics = exportStatistics;
 window.generatePDFForThesis = generatePDFForThesis;
+window.deleteAllTheses = deleteAllTheses;
