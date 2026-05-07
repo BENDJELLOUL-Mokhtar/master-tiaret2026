@@ -780,6 +780,9 @@ function showPage(pageId) {
         case 'schedule':
             updateSchedulePage();
             break;
+        case 'approval':
+            updateApprovalPage();
+            break;
         case 'add-thesis':
             if (editingThesisId) {
                 loadThesisForEdit(editingThesisId);
@@ -4532,3 +4535,345 @@ function specBadgeClass(spec) {
     };
     return map[spec] || 'badge-warning';
 }
+
+// ================================================
+// صفحة قبول المناقشة أو عدم القبول
+// ================================================
+
+let approvalFilter = 'all'; // all | none | pending | approved | rejected
+
+// حساب حالة قبول المناقشة لمذكرة
+function getApprovalStatus(thesis) {
+    const sr  = thesis.supervisor_report   || {};
+    const dd  = thesis.deputy_decision     || {};
+    const pr  = thesis.president_report    || {};
+    const er  = thesis.examiner_report     || {};
+    const cd  = thesis.committee_decision  || {};
+
+    if (cd.status === 'approved')   return 'approved';
+    if (cd.status === 'rejected')   return 'rejected';
+    if (dd.status === 'rejected')   return 'rejected';
+    if (dd.status === 'approved') {
+        if (pr.status === 'uploaded' && er.status === 'uploaded') return 'pending'; // in committee_decision
+        return 'pending';
+    }
+    if (sr.status === 'uploaded')   return 'pending';
+    return 'none';
+}
+
+// بطاقة حالة القبول (badge HTML)
+function approvalStatusBadge(thesis) {
+    const st = getApprovalStatus(thesis);
+    const dd = thesis.deputy_decision || {};
+    const cd = thesis.committee_decision || {};
+    if (st === 'approved') return '<span class="badge badge-done">✅ مقبولة للمناقشة</span>';
+    if (st === 'rejected') {
+        const who = cd.status === 'rejected' ? 'قرار اللجنة' : 'نائب الرئيس';
+        return `<span class="badge badge-postponed">❌ مرفوضة (${who})</span>`;
+    }
+    if (st === 'pending') {
+        const dd2 = thesis.deputy_decision || {};
+        if (dd2.status === 'approved') return '<span class="badge badge-pending">⏳ في انتظار تقارير اللجنة</span>';
+        if ((thesis.supervisor_report || {}).status === 'uploaded') return '<span class="badge badge-pending">⏳ في انتظار قرار نائب الرئيس</span>';
+        return '<span class="badge badge-pending">⏳ جارية المعالجة</span>';
+    }
+    return '<span class="badge badge-no-date">📂 لم يُرفع تقرير بعد</span>';
+}
+
+// الفلتر النشط
+function setApprovalFilter(f) {
+    approvalFilter = f;
+    ['all','none','pending','approved','rejected'].forEach(k => {
+        const btn = document.getElementById(`appr-filter-${k}`);
+        if (btn) btn.className = k === f ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+    });
+    renderApprovalTable();
+}
+
+// تحديث الصفحة
+function updateApprovalPage() {
+    renderApprovalStats();
+    renderApprovalTable();
+}
+
+function renderApprovalStats() {
+    let approved = 0, pending = 0, rejected = 0, none = 0;
+    theses.forEach(t => {
+        const st = getApprovalStatus(t);
+        if (st === 'approved') approved++;
+        else if (st === 'rejected') rejected++;
+        else if (st === 'pending') pending++;
+        else none++;
+    });
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('appr-count-approved', approved);
+    set('appr-count-pending',  pending);
+    set('appr-count-rejected', rejected);
+    set('appr-count-none',     none);
+}
+
+function renderApprovalTable() {
+    const container = document.getElementById('approval-table-container');
+    if (!container) return;
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const searchVal = (document.getElementById('appr-search')?.value || '').toLowerCase();
+
+    // فلترة حسب الدور + الفلتر المحدد + البحث
+    let list = theses.filter(t => {
+        // فلتر الحالة
+        const st = getApprovalStatus(t);
+        if (approvalFilter !== 'all' && st !== approvalFilter) return false;
+        // فلتر البحث
+        if (searchVal) {
+            const hay = `${t.title} ${t.student1} ${t.student2||''} ${t.supervisor}`.toLowerCase();
+            if (!hay.includes(searchVal)) return false;
+        }
+        // فلتر الدور: الأستاذ يرى فقط مذكراته
+        if (user.role === 'professor' || user.role === 'student') {
+            const name = user.fullName || user.professorName || '';
+            if (t.supervisor !== name && t.president !== name && t.examiner !== name) return false;
+        }
+        return true;
+    });
+
+    if (list.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><h3>لا توجد مذكرات</h3></div>';
+        return;
+    }
+
+    // رسم بطاقات لكل مذكرة
+    let html = '';
+    list.forEach(thesis => {
+        const sr = thesis.supervisor_report  || {};
+        const dd = thesis.deputy_decision    || {};
+        const pr = thesis.president_report   || {};
+        const er = thesis.examiner_report    || {};
+        const cd = thesis.committee_decision || {};
+        const userName = user.fullName || '';
+        const isDeputy  = ['admin','head','deputy','field_head'].includes(user.role);
+        const isSupervisor = user.role === 'professor' && thesis.supervisor === userName;
+        const isPresident  = user.role === 'professor' && thesis.president  === userName;
+        const isExaminer   = user.role === 'professor' && thesis.examiner   === userName;
+        const deputyUnlocked = dd.status === 'approved';
+
+        html += `<div class="approval-card">
+            <div class="approval-card-header">
+                <div>
+                    <span class="approval-card-number">${thesis.thesis_number}</span>
+                    <span class="approval-card-title">${truncateText(thesis.title, 80)}</span>
+                </div>
+                <div>${approvalStatusBadge(thesis)}</div>
+            </div>
+            <div class="approval-card-body">
+
+                <!-- المرحلة 1: تقرير المشرف -->
+                <div class="approval-step ${sr.status === 'uploaded' ? 'step-done' : 'step-pending'}">
+                    <div class="step-icon">${sr.status === 'uploaded' ? '📄' : '📂'}</div>
+                    <div class="step-content">
+                        <div class="step-title">1️⃣ تقرير جاهزية المذكرة <em>(المشرف: ${thesis.supervisor})</em></div>
+                        ${sr.status === 'uploaded'
+                            ? `<div class="step-info">✅ تم الرفع — <strong>${sr.fileName}</strong> — ${sr.uploadedAt}<br>${sr.note ? `<em>${sr.note}</em>` : ''}</div>`
+                            : `<div class="step-info" style="color:#e74c3c;">❌ لم يُرفع تقرير المشرف بعد — المذكرة معلقة</div>`}
+                        ${(isSupervisor || isDeputy) && sr.status !== 'uploaded'
+                            ? `<button onclick="triggerReportUpload('${thesis.id}','supervisor')" class="btn btn-info btn-sm" style="margin-top:6px;">📤 رفع تقرير المشرف</button>`
+                            : ''}
+                    </div>
+                </div>
+
+                <!-- المرحلة 2: قرار نائب الرئيس -->
+                <div class="approval-step ${dd.status === 'approved' ? 'step-done' : dd.status === 'rejected' ? 'step-rejected' : sr.status === 'uploaded' ? 'step-pending' : 'step-locked'}">
+                    <div class="step-icon">${dd.status === 'approved' ? '✅' : dd.status === 'rejected' ? '❌' : '⏳'}</div>
+                    <div class="step-content">
+                        <div class="step-title">2️⃣ قرار نائب رئيس القسم على تقرير المشرف</div>
+                        ${dd.status === 'approved'
+                            ? `<div class="step-info" style="color:#27ae60;">✅ مقبول — ${dd.decidedAt} — ${dd.decidedBy}${dd.note ? ` — <em>${dd.note}</em>` : ''}</div>`
+                            : dd.status === 'rejected'
+                            ? `<div class="step-info" style="color:#e74c3c;">❌ مرفوض — ${dd.decidedBy}${dd.note ? ` — <em>${dd.note}</em>` : ''}</div>`
+                            : sr.status === 'uploaded'
+                            ? `<div class="step-info" style="color:#f39c12;">⏳ في انتظار قرار نائب الرئيس</div>`
+                            : `<div class="step-info" style="color:#95a5a6;">🔒 مقفل — يحتاج رفع تقرير المشرف أولاً</div>`}
+                        ${isDeputy && sr.status === 'uploaded' && !dd.status
+                            ? `<button onclick="openDeputyModal('${thesis.id}','supervisor_report')" class="btn btn-success btn-sm" style="margin-top:6px;">📋 إصدار القرار</button>`
+                            : ''}
+                        ${isDeputy && dd.status === 'rejected'
+                            ? `<button onclick="resetDeputyDecision('${thesis.id}')" class="btn btn-secondary btn-sm" style="margin-top:6px;">🔄 إعادة تفعيل</button>`
+                            : ''}
+                    </div>
+                </div>
+
+                <!-- المرحلة 3: تقارير اللجنة -->
+                <div class="approval-step ${(pr.status === 'uploaded' && er.status === 'uploaded') ? 'step-done' : deputyUnlocked ? 'step-pending' : 'step-locked'}">
+                    <div class="step-icon">${(pr.status === 'uploaded' && er.status === 'uploaded') ? '📋' : '📄'}</div>
+                    <div class="step-content">
+                        <div class="step-title">3️⃣ تقارير قبول المناقشة من اللجنة</div>
+                        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;">
+                            <!-- تقرير الرئيس -->
+                            <div style="flex:1;min-width:200px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #dee2e6;">
+                                <div style="font-weight:600;margin-bottom:4px;">رئيس اللجنة: ${thesis.president}</div>
+                                ${pr.status === 'uploaded'
+                                    ? `<div style="color:#27ae60;font-size:0.85rem;">✅ ${pr.fileName} — ${pr.uploadedAt}</div>`
+                                    : deputyUnlocked
+                                    ? `<div style="color:#e74c3c;font-size:0.85rem;">❌ لم يُرفع تقرير بعد</div>`
+                                    : `<div style="color:#95a5a6;font-size:0.85rem;">🔒 مقفل</div>`}
+                                ${(isPresident || isDeputy) && deputyUnlocked && pr.status !== 'uploaded'
+                                    ? `<button onclick="triggerReportUpload('${thesis.id}','president')" class="btn btn-info btn-sm" style="margin-top:6px;">📤 رفع التقرير</button>`
+                                    : ''}
+                            </div>
+                            <!-- تقرير المناقش -->
+                            <div style="flex:1;min-width:200px;padding:8px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #dee2e6;">
+                                <div style="font-weight:600;margin-bottom:4px;">العضو المناقش: ${thesis.examiner}</div>
+                                ${er.status === 'uploaded'
+                                    ? `<div style="color:#27ae60;font-size:0.85rem;">✅ ${er.fileName} — ${er.uploadedAt}</div>`
+                                    : deputyUnlocked
+                                    ? `<div style="color:#e74c3c;font-size:0.85rem;">❌ لم يُرفع تقرير بعد</div>`
+                                    : `<div style="color:#95a5a6;font-size:0.85rem;">🔒 مقفل</div>`}
+                                ${(isExaminer || isDeputy) && deputyUnlocked && er.status !== 'uploaded'
+                                    ? `<button onclick="triggerReportUpload('${thesis.id}','examiner')" class="btn btn-info btn-sm" style="margin-top:6px;">📤 رفع التقرير</button>`
+                                    : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- المرحلة 4: القرار النهائي -->
+                <div class="approval-step ${cd.status === 'approved' ? 'step-done' : cd.status === 'rejected' ? 'step-rejected' : (pr.status === 'uploaded' && er.status === 'uploaded' && deputyUnlocked) ? 'step-pending' : 'step-locked'}">
+                    <div class="step-icon">${cd.status === 'approved' ? '🎓' : cd.status === 'rejected' ? '❌' : '⏳'}</div>
+                    <div class="step-content">
+                        <div class="step-title">4️⃣ القرار النهائي لنائب رئيس القسم (قبول / رفض المناقشة)</div>
+                        ${cd.status === 'approved'
+                            ? `<div class="step-info" style="color:#27ae60;font-weight:700;">🎓 المذكرة مقبولة للمناقشة — ${cd.decidedAt}${cd.note ? ` — <em>${cd.note}</em>` : ''}</div>`
+                            : cd.status === 'rejected'
+                            ? `<div class="step-info" style="color:#e74c3c;">❌ مرفوضة — ${cd.decidedBy}${cd.note ? ` — <em>${cd.note}</em>` : ''}</div>`
+                            : (pr.status === 'uploaded' && er.status === 'uploaded' && deputyUnlocked)
+                            ? `<div class="step-info" style="color:#f39c12;">⏳ في انتظار القرار النهائي لنائب الرئيس</div>`
+                            : `<div class="step-info" style="color:#95a5a6;">🔒 يحتاج استيفاء المراحل السابقة</div>`}
+                        ${isDeputy && pr.status === 'uploaded' && er.status === 'uploaded' && deputyUnlocked && !cd.status
+                            ? `<button onclick="openDeputyModal('${thesis.id}','committee_reports')" class="btn btn-success btn-sm" style="margin-top:6px;">🎓 إصدار القرار النهائي</button>`
+                            : ''}
+                    </div>
+                </div>
+
+            </div>
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+// فتح مودال القرار لنائب الرئيس
+function openDeputyModal(thesisId, reportType) {
+    const thesis = theses.find(t => t.id === thesisId);
+    if (!thesis) return;
+    document.getElementById('deputy-modal-thesis-id').value   = thesisId;
+    document.getElementById('deputy-modal-report-type').value = reportType;
+    document.getElementById('deputy-modal-note').value        = '';
+    const titleEl = document.getElementById('deputy-modal-title');
+    const infoEl  = document.getElementById('deputy-modal-thesis-info');
+    if (reportType === 'supervisor_report') {
+        if (titleEl) titleEl.textContent = '📋 القرار على تقرير جاهزية المشرف';
+        if (infoEl)  infoEl.textContent  = truncateText(thesis.title, 100);
+    } else {
+        if (titleEl) titleEl.textContent = '🎓 القرار النهائي (قبول / رفض المناقشة)';
+        if (infoEl)  infoEl.textContent  = truncateText(thesis.title, 100);
+    }
+    document.getElementById('deputy-decision-modal').classList.add('active');
+}
+
+function closeDeputyModal() {
+    document.getElementById('deputy-decision-modal').classList.remove('active');
+}
+
+function submitDeputyDecision(approved) {
+    const thesisId   = document.getElementById('deputy-modal-thesis-id').value;
+    const reportType = document.getElementById('deputy-modal-report-type').value;
+    const note       = document.getElementById('deputy-modal-note').value.trim();
+    const thesis     = theses.find(t => t.id === thesisId);
+    if (!thesis) return;
+    const user = getCurrentUser();
+    const now  = new Date().toLocaleString('ar-DZ');
+
+    if (reportType === 'supervisor_report') {
+        thesis.deputy_decision = {
+            status:    approved ? 'approved' : 'rejected',
+            decidedAt: now,
+            decidedBy: user?.fullName || '',
+            note
+        };
+        showToast(approved ? '✅ تم قبول تقرير المشرف — يمكن للجنة الآن رفع تقاريرها' : '❌ تم رفض تقرير المشرف', approved ? 'success' : 'error');
+    } else {
+        thesis.committee_decision = {
+            status:    approved ? 'approved' : 'rejected',
+            decidedAt: now,
+            decidedBy: user?.fullName || '',
+            note
+        };
+        showToast(approved ? '🎓 تم قبول المذكرة للمناقشة نهائياً!' : '❌ تم رفض المذكرة للمناقشة', approved ? 'success' : 'error');
+    }
+
+    saveData();
+    closeDeputyModal();
+    renderApprovalStats();
+    renderApprovalTable();
+}
+
+// إعادة تعيين قرار نائب الرئيس (السماح بإعادة الرفع)
+function resetDeputyDecision(thesisId) {
+    if (!confirm('هل تريد إعادة تفعيل مسار القبول لهذه المذكرة؟')) return;
+    const thesis = theses.find(t => t.id === thesisId);
+    if (!thesis) return;
+    thesis.deputy_decision    = {};
+    thesis.supervisor_report  = {};
+    thesis.president_report   = {};
+    thesis.examiner_report    = {};
+    thesis.committee_decision = {};
+    saveData();
+    renderApprovalStats();
+    renderApprovalTable();
+    showToast('🔄 تم إعادة تفعيل مسار القبول', 'info');
+}
+
+// تشغيل حقل الملف المناسب
+function triggerReportUpload(thesisId, role) {
+    document.getElementById('appr-current-thesis-id').value = thesisId;
+    const inputId = `appr-${role}-file-input`;
+    const el = document.getElementById(inputId);
+    if (el) { el.value = ''; el.click(); }
+}
+
+// معالجة الملف المرفوع
+function handleReportFileChange(event, role) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const thesisId = document.getElementById('appr-current-thesis-id').value;
+    const thesis   = theses.find(t => t.id === thesisId);
+    if (!thesis) return;
+    const user = getCurrentUser();
+    const now  = new Date().toLocaleString('ar-DZ');
+    const info = {
+        status:     'uploaded',
+        fileName:   file.name,
+        fileSize:   (file.size / 1024).toFixed(1) + ' KB',
+        uploadedAt: now,
+        uploadedBy: user?.fullName || '',
+        note: ''
+    };
+    if (role === 'supervisor') thesis.supervisor_report = info;
+    else if (role === 'president') thesis.president_report = info;
+    else if (role === 'examiner')  thesis.examiner_report  = info;
+    saveData();
+    renderApprovalStats();
+    renderApprovalTable();
+    showToast(`✅ تم رفع التقرير بنجاح — ${file.name}`, 'success');
+}
+
+window.updateApprovalPage    = updateApprovalPage;
+window.setApprovalFilter     = setApprovalFilter;
+window.renderApprovalTable   = renderApprovalTable;
+window.openDeputyModal       = openDeputyModal;
+window.closeDeputyModal      = closeDeputyModal;
+window.submitDeputyDecision  = submitDeputyDecision;
+window.resetDeputyDecision   = resetDeputyDecision;
+window.triggerReportUpload   = triggerReportUpload;
+window.handleReportFileChange= handleReportFileChange;

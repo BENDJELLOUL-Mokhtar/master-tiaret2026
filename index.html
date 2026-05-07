@@ -214,6 +214,10 @@
                     <span class="icon">🗓️</span>
                     <span>برنامج المناقشات</span>
                 </a>
+                <a href="#" onclick="showPage('approval')" class="nav-item" data-page="approval">
+                    <span class="icon">📄</span>
+                    <span>قبول المناقشة</span>
+                </a>
             </nav>
         </aside>
 
@@ -726,6 +730,77 @@
                 </div>
             </div>
 
+            <!-- صفحة قبول المناقشة أو عدم القبول -->
+            <div id="approval" class="page">
+                <div class="page-header">
+                    <h2>📄 قبول المناقشة أو عدمها</h2>
+                    <p class="subtitle">مسار تقارير الإذن بالمناقشة</p>
+                </div>
+
+                <!-- بطاقات إحصائية -->
+                <div class="stats-grid" style="margin-bottom:20px;">
+                    <div class="stat-card success">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-content">
+                            <h3 id="appr-count-approved">0</h3>
+                            <p>مقبولة للمناقشة</p>
+                        </div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-icon">⏳</div>
+                        <div class="stat-content">
+                            <h3 id="appr-count-pending">0</h3>
+                            <p>في انتظار المعالجة</p>
+                        </div>
+                    </div>
+                    <div class="stat-card danger">
+                        <div class="stat-icon">❌</div>
+                        <div class="stat-content">
+                            <h3 id="appr-count-rejected">0</h3>
+                            <p>مرفوضة</p>
+                        </div>
+                    </div>
+                    <div class="stat-card primary">
+                        <div class="stat-icon">📂</div>
+                        <div class="stat-content">
+                            <h3 id="appr-count-none">0</h3>
+                            <p>لم يرفع تقرير بعد</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- فلتر سريع -->
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;align-items:center;">
+                    <span style="font-weight:600;color:var(--gray-700);،">عرض:</span>
+                    <button onclick="setApprovalFilter('all')" id="appr-filter-all" class="btn btn-primary btn-sm">الكل</button>
+                    <button onclick="setApprovalFilter('none')" id="appr-filter-none" class="btn btn-secondary btn-sm">لم يرفع تقرير</button>
+                    <button onclick="setApprovalFilter('pending')" id="appr-filter-pending" class="btn btn-secondary btn-sm">في انتظار</button>
+                    <button onclick="setApprovalFilter('approved')" id="appr-filter-approved" class="btn btn-secondary btn-sm">مقبولة</button>
+                    <button onclick="setApprovalFilter('rejected')" id="appr-filter-rejected" class="btn btn-secondary btn-sm">مرفوضة</button>
+                    <input type="text" id="appr-search" placeholder="🔍 بحث بالموضوع أو الطالب..."
+                        oninput="renderApprovalTable()"
+                        style="flex:1;min-width:200px;padding:7px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:Cairo,sans-serif;">
+                </div>
+
+                <!-- الجدول -->
+                <div id="approval-table-container"></div>
+
+                <!-- ملاحظة التحميل -->
+                <div style="margin-top:18px;padding:14px 18px;background:#E3F2FD;border-radius:10px;border-right:4px solid #2196F3;font-size:0.9rem;color:#1565C0;">
+                    <strong>تسلسل مسار القبول:</strong>&nbsp;
+                    1️⃣ المشرف يرفع تقرير الجاهزية
+                    ➜ 2️⃣ نائب رئيس القسم يوافق أو يرفض
+                    ➜ 3️⃣ (عند الموافقة) رئيس اللجنة والمناقش يرفعان تقريري القبول
+                    ➜ 4️⃣ نائب رئيس القسم يصدر القرار النهائي
+                </div>
+
+                <!-- خلايا مخفية للتحميل -->
+                <input type="file" id="appr-supervisor-file-input" accept=".pdf,.doc,.docx" style="display:none;" onchange="handleReportFileChange(event, 'supervisor')">
+                <input type="file" id="appr-president-file-input" accept=".pdf,.doc,.docx" style="display:none;" onchange="handleReportFileChange(event, 'president')">
+                <input type="file" id="appr-examiner-file-input" accept=".pdf,.doc,.docx" style="display:none;" onchange="handleReportFileChange(event, 'examiner')">
+                <input type="hidden" id="appr-current-thesis-id" value="">
+            </div>
+
         </main>
     </div>
 
@@ -752,6 +827,30 @@
                 <button onclick="closeConflictModal()" class="close-btn">&times;</button>
             </div>
             <div class="modal-body" id="conflict-content"></div>
+        </div>
+    </div>
+
+    <!-- نافذة قرار نائب الرئيس -->
+    <div id="deputy-decision-modal" class="modal">
+        <div class="modal-content modal-conflict" style="max-width:500px;">
+            <div class="modal-header">
+                <h3 id="deputy-modal-title">📋 قرار نائب رئيس القسم</h3>
+                <button onclick="closeDeputyModal()" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="deputy-modal-thesis-id">
+                <input type="hidden" id="deputy-modal-report-type">
+                <div id="deputy-modal-thesis-info" style="background:#EDE7F6;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-weight:600;color:#4a148c;font-size:0.9rem;"></div>
+                <div class="form-group">
+                    <label for="deputy-modal-note">ملاحظات (اختياري)</label>
+                    <textarea id="deputy-modal-note" rows="3" placeholder="أضف ملاحظاتك هنا..." style="width:100%;padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:Cairo,sans-serif;resize:vertical;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="display:flex;gap:10px;justify-content:flex-end;padding:16px 20px;border-top:1px solid #eee;">
+                <button onclick="submitDeputyDecision(true)" class="btn btn-success">✅ الموافقة</button>
+                <button onclick="submitDeputyDecision(false)" class="btn btn-danger">❌ الرفض</button>
+                <button onclick="closeDeputyModal()" class="btn btn-secondary">إلغاء</button>
+            </div>
         </div>
     </div>
 
