@@ -220,10 +220,14 @@
                 <div class="page-header">
                     <h2>لوحة التحكم</h2>
                     <p class="subtitle">الموسم الجامعي: 2025/2026</p>
-                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
                         <button id="smart-sched-btn" onclick="openSchedulingModal()" class="btn btn-success smart-sched-btn" style="display:none;">
                             🤖 جدولة ذكية
                         </button>
+                        <label id="import-excel-btn" class="btn btn-import-excel" title="استيراد بيانات المذكرات من ملف Excel" style="display:none;cursor:pointer;">
+                            <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleDashboardExcelUpload(event)">
+                            📥 استيراد Excel
+                        </label>
                         <button id="delete-all-btn" onclick="deleteAllTheses()" class="btn btn-danger delete-all-btn" style="display:none;">
                             🗑️ حذف كل المذكرات
                         </button>

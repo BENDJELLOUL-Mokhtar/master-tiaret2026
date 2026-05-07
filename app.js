@@ -392,6 +392,12 @@ function updateUIForUser(user) {
         schedBtn.style.display = hasPermission('edit') ? 'inline-flex' : 'none';
     }
 
+    // زر استيراد Excel في لوحة التحكم
+    const dashImportBtn = document.getElementById('import-excel-btn');
+    if (dashImportBtn) {
+        dashImportBtn.style.display = hasPermission('import') ? 'inline-flex' : 'none';
+    }
+
     // إخفاء أزرار الاستيراد والتصدير حسب الصلاحيات
     const importBtn = document.querySelector('button[onclick="importExcel()"]');
     const exportBtn = document.querySelector('button[onclick="exportToExcel()"]');
@@ -2587,6 +2593,19 @@ function importExcel() {
     input.onchange = handleFileUpload;
     input.click();
 }
+
+// معالجة ملف Excel المُرفَّع من زر لوحة التحكم
+function handleDashboardExcelUpload(e) {
+    if (!hasPermission('import')) {
+        showToast('ليس لديك صلاحية الاستيراد', 'error');
+        // إعادة تعيين قيمة الحقل حتى يمكن اختيار نفس الملف مجدداً
+        e.target.value = '';
+        return;
+    }
+    handleFileUpload(e);
+    e.target.value = '';
+}
+
 
 function importExcelInForm() {
     // فحص الصلاحيات

@@ -608,6 +608,24 @@ body {
 
 .smart-sched-btn:hover { transform: scale(1.05); filter: brightness(1.1); }
 
+/* زر استيراد Excel في لوحة التحكم */
+.btn-import-excel {
+    background: linear-gradient(135deg, #1565C0, #1976D2) !important;
+    border: 2px solid #0D47A1 !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    padding: 10px 22px !important;
+    border-radius: 8px !important;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.15s, filter 0.15s;
+    font-family: 'Cairo', sans-serif;
+}
+.btn-import-excel:hover { transform: scale(1.05); filter: brightness(1.12); }
+
 /* ================================================
    نافذة الجدولة الذكية
 ================================================ */
