@@ -12,6 +12,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <!-- صفحة تسجيل الدخول -->
@@ -610,6 +611,41 @@
                     <button onclick="exportStatistics()" class="btn btn-primary">📊 تصدير الإحصائيات</button>
                 </div>
 
+                <!-- بطاقات الملخص -->
+                <div id="stats-summary-cards" class="stats-grid" style="margin-bottom: 24px;"></div>
+
+                <!-- الرسوم البيانية - الصف الأول -->
+                <div class="charts-row">
+                    <div class="chart-card">
+                        <h3 class="chart-title">📊 توزيع المذكرات حسب الشعبة</h3>
+                        <div class="chart-wrapper-sm">
+                            <canvas id="chart-branch"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3 class="chart-title">📚 توزيع المذكرات حسب التخصص</h3>
+                        <div class="chart-wrapper-sm">
+                            <canvas id="chart-spec"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- أكثر الأساتذة مشاركة -->
+                <div class="chart-card" style="margin-bottom: 24px;">
+                    <h3 class="chart-title">👨‍🏫 أكثر الأساتذة مشاركة (أعلى 10)</h3>
+                    <div class="chart-wrapper-lg">
+                        <canvas id="chart-professors"></canvas>
+                    </div>
+                </div>
+
+                <!-- تفصيل أدوار الأساتذة -->
+                <div class="chart-card" style="margin-bottom: 24px;">
+                    <h3 class="chart-title">🎭 تفصيل أدوار الأساتذة (أعلى 10)</h3>
+                    <div class="chart-wrapper-lg">
+                        <canvas id="chart-roles"></canvas>
+                    </div>
+                </div>
+
                 <!-- بحث عن أستاذ -->
                 <div class="professor-search-section">
                     <div class="search-header">
@@ -626,6 +662,7 @@
                     <div id="professor-search-results"></div>
                 </div>
 
+                <!-- الجدول التفصيلي -->
                 <div id="statistics-table-container"></div>
             </div>
         </main>

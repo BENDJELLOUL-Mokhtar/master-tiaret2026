@@ -180,7 +180,9 @@ function handleLogin(event) {
             title: user.title,
             permissions: user.permissions,
             professorName: user.professorName,
-            studentName: user.studentName
+            studentName: user.studentName,
+            branch: user.branch,
+            specialization: user.specialization
         };
         localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
         
@@ -1738,47 +1740,229 @@ function loadProfessorsList() {
 // صفحة الإحصائيات
 // ================================================
 
-function updateStatisticsPage() {
-    const container = document.getElementById('statistics-table-container');
-    const stats = getProfessorsStats();
+// مخازن الرسوم البيانية
+let statCharts = {};
 
-    if (stats.length === 0) {
+function destroyStatCharts() {
+    Object.values(statCharts).forEach(c => { if (c) c.destroy(); });
+    statCharts = {};
+}
+
+function updateStatisticsPage() {
+    const data = getVisibleThesesForUser();
+    const container = document.getElementById('statistics-table-container');
+    const cardsEl   = document.getElementById('stats-summary-cards');
+
+    destroyStatCharts();
+
+    if (data.length === 0) {
+        if (cardsEl) cardsEl.innerHTML = '';
         container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📊</div><h3>لا توجد إحصائيات</h3><p>أضف مذكرات لعرض الإحصائيات</p></div>';
         return;
     }
 
-    // إحصائيات عامة
-    let html = '<div class="stats-summary" style="margin-bottom: 30px;">';
-    html += '<div class="stats-grid-3">';
-    html += `<div class="stat-card-small"><h4>${theses.length}</h4><p>إجمالي المذكرات</p></div>`;
-    html += `<div class="stat-card-small"><h4>${stats.length}</h4><p>عدد الأساتذة</p></div>`;
-    html += `<div class="stat-card-small"><h4>${stats.reduce((sum, s) => sum + s.total, 0)}</h4><p>إجمالي المشاركات</p></div>`;
-    html += '</div></div>';
+    const stats = getProfessorsStats();
 
-    // إحصائيات حسب التخصص
+    // --- بطاقات الملخص ---
+    if (cardsEl) {
+        cardsEl.innerHTML = `
+            <div class="stat-card primary">
+                <div class="stat-icon">📋</div>
+                <div class="stat-content"><h3>${data.length}</h3><p>إجمالي المذكرات</p></div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-icon">👨‍🏫</div>
+                <div class="stat-content"><h3>${stats.length}</h3><p>عدد الأساتذة</p></div>
+            </div>
+            <div class="stat-card info">
+                <div class="stat-icon">🎖️</div>
+                <div class="stat-content"><h3>${stats.reduce((s, p) => s + p.total, 0)}</h3><p>إجمالي المشاركات</p></div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-icon">🏆</div>
+                <div class="stat-content"><h3 style="font-size:1.2rem">${stats[0]?.name || '-'}</h3><p>الأكثر مشاركة</p></div>
+            </div>
+        `;
+    }
+
+    const chartDefaults = {
+        font: { family: "'Cairo', sans-serif" }
+    };
+    Chart.defaults.font.family = "'Cairo', sans-serif";
+
+    // --- رسم 1: الشعب (Doughnut) ---
+    const ctxBranch = document.getElementById('chart-branch')?.getContext('2d');
+    if (ctxBranch) {
+        const branchLabels = BRANCHES;
+        const branchData   = branchLabels.map(b => data.filter(t => t.branch === b).length);
+        statCharts.branch  = new Chart(ctxBranch, {
+            type: 'doughnut',
+            data: {
+                labels: branchLabels,
+                datasets: [{
+                    data: branchData,
+                    backgroundColor: ['#1B5E20', '#1565C0', '#E65100'],
+                    borderWidth: 3,
+                    borderColor: '#fff',
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { padding: 18, font: { size: 13 }, usePointStyle: true }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.label}: ${ctx.parsed} مذكرة`
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // --- رسم 2: التخصصات (Bar عمودي) ---
+    const ctxSpec = document.getElementById('chart-spec')?.getContext('2d');
+    if (ctxSpec) {
+        const specLabels = ALL_SPECIALIZATIONS;
+        const specData   = specLabels.map(s => data.filter(t => t.specialization === s).length);
+        statCharts.spec  = new Chart(ctxSpec, {
+            type: 'bar',
+            data: {
+                labels: specLabels,
+                datasets: [{
+                    label: 'عدد المذكرات',
+                    data: specData,
+                    backgroundColor: ['#1B5E20', '#2E7D32', '#1565C0', '#E65100'],
+                    borderRadius: 8,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: { label: ctx => ` ${ctx.parsed.y} مذكرة` }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f0f0f0' } },
+                    x: { ticks: { font: { size: 11 } }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    const top10 = stats.slice(0, 10);
+
+    // --- رسم 3: أعلى 10 أساتذة (Bar أفقي) ---
+    const ctxProf = document.getElementById('chart-professors')?.getContext('2d');
+    if (ctxProf) {
+        statCharts.professors = new Chart(ctxProf, {
+            type: 'bar',
+            data: {
+                labels: top10.map(p => p.name),
+                datasets: [{
+                    label: 'إجمالي المشاركات',
+                    data: top10.map(p => p.total),
+                    backgroundColor: top10.map((_, i) =>
+                        `rgba(27, 94, 32, ${1 - i * 0.07})`),
+                    borderRadius: 6,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: { label: ctx => ` ${ctx.parsed.x} مشاركة` }
+                    }
+                },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f0f0f0' } },
+                    y: { ticks: { font: { size: 12 } }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // --- رسم 4: تفصيل أدوار الأساتذة (Stacked Bar أفقي) ---
+    const ctxRoles = document.getElementById('chart-roles')?.getContext('2d');
+    if (ctxRoles) {
+        statCharts.roles = new Chart(ctxRoles, {
+            type: 'bar',
+            data: {
+                labels: top10.map(p => p.name),
+                datasets: [
+                    {
+                        label: 'إشرافات',
+                        data: top10.map(p => p.supervisions),
+                        backgroundColor: '#1B5E20',
+                        borderRadius: 4,
+                        borderWidth: 0
+                    },
+                    {
+                        label: 'رئاسات',
+                        data: top10.map(p => p.presidencies),
+                        backgroundColor: '#1565C0',
+                        borderRadius: 4,
+                        borderWidth: 0
+                    },
+                    {
+                        label: 'عضويات',
+                        data: top10.map(p => p.examinations),
+                        backgroundColor: '#E65100',
+                        borderRadius: 4,
+                        borderWidth: 0
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { padding: 18, font: { size: 13 }, usePointStyle: true }
+                    }
+                },
+                scales: {
+                    x: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f0f0f0' } },
+                    y: { stacked: true, ticks: { font: { size: 12 } }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // --- الجدول التفصيلي ---
+    let html = '';
     ALL_SPECIALIZATIONS.forEach(spec => {
-        const specTheses = theses.filter(t => t.specialization === spec);
+        const specTheses = data.filter(t => t.specialization === spec);
         if (specTheses.length === 0) return;
 
-        html += `<h3 style="margin: 30px 0 15px; color: var(--primary-dark);">📚 ${spec} (${specTheses.length} مذكرة)</h3>`;
-        html += '<div class="table-container"><table>';
-        html += '<thead><tr>';
-        html += '<th>الأستاذ</th>';
-        html += '<th>الإشرافات</th>';
-        html += '<th>الرئاسات</th>';
-        html += '<th>العضويات</th>';
-        html += '<th>المجموع</th>';
-        html += '</tr></thead><tbody>';
+        html += `<h3 class="stats-section-title">📚 ${spec} <span class="badge-count">${specTheses.length} مذكرة</span></h3>`;
+        html += '<div class="table-container" style="margin-bottom:24px;"><table>';
+        html += '<thead><tr><th>الأستاذ</th><th>الإشرافات</th><th>الرئاسات</th><th>العضويات</th><th>المجموع</th></tr></thead><tbody>';
 
-        const specStats = getStatsBySpecialization(spec);
-        specStats.forEach(prof => {
-            html += '<tr>';
-            html += `<td>${prof.name}</td>`;
-            html += `<td>${prof.supervisions}</td>`;
-            html += `<td>${prof.presidencies}</td>`;
-            html += `<td>${prof.examinations}</td>`;
-            html += `<td><strong>${prof.total}</strong></td>`;
-            html += '</tr>';
+        getStatsBySpecialization(spec).forEach(prof => {
+            html += `<tr>
+                <td>${prof.name}</td>
+                <td><span class="role-pill sup">${prof.supervisions}</span></td>
+                <td><span class="role-pill pre">${prof.presidencies}</span></td>
+                <td><span class="role-pill exa">${prof.examinations}</span></td>
+                <td><strong>${prof.total}</strong></td>
+            </tr>`;
         });
 
         html += '</tbody></table></div>';
