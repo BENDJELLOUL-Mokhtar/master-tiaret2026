@@ -173,7 +173,7 @@ const DEFAULT_USERS = [
         id: 4,
         username: 'field_head',
         password: 'field123',
-        fullName: 'أ.د العيد جلولي',
+        fullName: 'أ.د تركي امحمد',
         role: 'field_head',
         roleAr: 'رئيس الميدان',
         title: 'رئيس ميدان اللغة والأدب العربي',
