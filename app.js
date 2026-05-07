@@ -3026,7 +3026,10 @@ function generateCertificateHTML(thesis) {
                         </div>
                     </div>
                     <div class="stamp-section">
-                        <div class="stamp-label">الختم الرسمي</div>
+                        <div class="stamp-label">تأشيرة رئيس القسم</div>
+                        <div class="stamp-name">أ.د احميدة مداني</div>
+                        <div class="stamp-title">رئيس قسم اللغة العربية وآدابها</div>
+                        <div class="stamp-space"></div>
                     </div>
                 </div>
             </div>
@@ -3285,14 +3288,32 @@ function downloadPDF() {
         .stamp-section {
             text-align: center;
             margin-top: 6px;
-            padding: 8px;
-            border: 3px double #000;
+            padding: 10px 8px 8px;
+            border: 2px solid #1B5E20;
+            border-radius: 4px;
             background: white;
         }
         .stamp-label {
             font-weight: 700;
-            font-size: 1rem;
+            font-size: 0.88rem;
+            color: #1B5E20;
+            margin-bottom: 2px;
+        }
+        .stamp-name {
+            font-weight: 800;
+            font-size: 0.95rem;
             color: #1a1a1a;
+            margin-bottom: 1px;
+        }
+        .stamp-title {
+            font-size: 0.78rem;
+            color: #555;
+            margin-bottom: 4px;
+        }
+        .stamp-space {
+            height: 38px;
+            border-bottom: 1.5px dashed #999;
+            margin: 4px 8px 0;
         }
         @media print {
             body {

@@ -2325,14 +2325,35 @@ tbody td {
 .stamp-section {
     text-align: center;
     margin-top: 10px;
-    padding: 10px;
-    border: 2px dashed #333;
+    padding: 10px 8px 8px;
+    border: 2px solid #1B5E20;
+    border-radius: 4px;
 }
 
 .stamp-label {
     font-weight: 700;
-    color: #000;
-    font-size: 1rem;
+    color: #1B5E20;
+    font-size: 0.88rem;
+    margin-bottom: 2px;
+}
+
+.stamp-name {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: #1a1a1a;
+    margin-bottom: 1px;
+}
+
+.stamp-title {
+    font-size: 0.78rem;
+    color: #555;
+    margin-bottom: 4px;
+}
+
+.stamp-space {
+    height: 38px;
+    border-bottom: 1.5px dashed #999;
+    margin: 4px 8px 0;
 }
 
 /* تنسيق الطباعة */
