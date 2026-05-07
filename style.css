@@ -2020,7 +2020,7 @@ tbody td {
     margin-bottom: 20px;
 }
 
-.professor-search-input {
+.professor-search-select {
     width: 100%;
     padding: 15px 50px 15px 20px;
     border: 2px solid var(--gray-300);
@@ -2029,9 +2029,10 @@ tbody td {
     font-family: 'Cairo', sans-serif;
     transition: all 0.3s ease;
     background: var(--gray-100);
+    cursor: pointer;
 }
 
-.professor-search-input:focus {
+.professor-search-select:focus {
     outline: none;
     border-color: var(--primary-color);
     background: white;
@@ -2817,7 +2818,7 @@ tbody td {
         border-bottom: none;
     }
 
-    .professor-search-input {
+    .professor-search-select {
         font-size: 1rem;
         padding: 12px 45px 12px 15px;
     }

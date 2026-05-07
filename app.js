@@ -2322,6 +2322,9 @@ function updateProfessorsPage() {
 
     html += '</tbody></table></div>';
     container.innerHTML = html;
+    
+    // ملء قائمة البحث عن الأساتذة
+    populateProfessorSearchDropdown();
 }
 
 function getProfessorsStats() {
@@ -2407,6 +2410,7 @@ function updateStatisticsPage() {
     }
 
     const stats = getProfessorsStats();
+    const top10 = stats.slice(0, 10);
 
     // --- بطاقات الملخص ---
     if (cardsEl) {
@@ -2624,8 +2628,9 @@ function updateStatisticsPage() {
     try {
         Chart.defaults.font.family = "'Cairo', sans-serif";
     } catch(e) { return; }
-
-    const top10 = stats.slice(0, 10);
+    
+    // ملء قائمة البحث عن الأساتذة
+    populateProfessorSearchDropdown();
 }
 
 function getStatsBySpecialization(specialization) {
@@ -2664,26 +2669,60 @@ function getStatsBySpecializationFromData(data, specialization) {
 // البحث عن مناقشات أستاذ
 // ================================================
 
-function searchProfessorTheses() {
-    const searchInput = document.getElementById('professor-search-input');
-    const resultsContainer = document.getElementById('professor-search-results');
-    const searchTerm = searchInput.value.trim();
+// ملء قائمة الأساتذة المنسدلة من لجان المناقشة
+function populateProfessorSearchDropdown() {
+    const selectElement = document.getElementById('professor-search-select');
+    if (!selectElement) return;
 
-    if (!searchTerm || searchTerm.length < 3) {
+    // جمع أسماء الأساتذة من لجان المناقشة في المذكرات فقط
+    const professorsSet = new Set();
+    
+    theses.forEach(thesis => {
+        if (thesis.supervisor && thesis.supervisor.trim()) {
+            professorsSet.add(thesis.supervisor.trim());
+        }
+        if (thesis.president && thesis.president.trim()) {
+            professorsSet.add(thesis.president.trim());
+        }
+        if (thesis.examiner && thesis.examiner.trim()) {
+            professorsSet.add(thesis.examiner.trim());
+        }
+    });
+
+    // تحويل المجموعة إلى مصفوفة وترتيبها أبجدياً
+    const professorsList = Array.from(professorsSet).sort();
+
+    // مسح القائمة الحالية (الاحتفاظ بالخيار الأول فقط)
+    selectElement.innerHTML = '<option value="">-- اختر أستاذاً --</option>';
+
+    // إضافة الأساتذة إلى القائمة المنسدلة
+    professorsList.forEach(profName => {
+        const option = document.createElement('option');
+        option.value = profName;
+        option.textContent = profName;
+        selectElement.appendChild(option);
+    });
+}
+
+function searchProfessorTheses() {
+    const selectElement = document.getElementById('professor-search-select');
+    const resultsContainer = document.getElementById('professor-search-results');
+    const selectedProfessor = selectElement.value.trim();
+
+    if (!selectedProfessor) {
         resultsContainer.innerHTML = '';
         return;
     }
 
-    // البحث عن جميع المذكرات التي شارك فيها الأستاذ
+    // البحث عن جميع المذكرات التي شارك فيها الأستاذ المحدد
     const professorTheses = theses.filter(thesis => {
-        const supervisor = thesis.supervisor?.toLowerCase() || '';
-        const president = thesis.president?.toLowerCase() || '';
-        const examiner = thesis.examiner?.toLowerCase() || '';
-        const search = searchTerm.toLowerCase();
+        const supervisor = thesis.supervisor?.trim() || '';
+        const president = thesis.president?.trim() || '';
+        const examiner = thesis.examiner?.trim() || '';
 
-        return supervisor.includes(search) || 
-               president.includes(search) || 
-               examiner.includes(search);
+        return supervisor === selectedProfessor || 
+               president === selectedProfessor || 
+               examiner === selectedProfessor;
     });
 
     if (professorTheses.length === 0) {
@@ -2707,10 +2746,9 @@ function searchProfessorTheses() {
     };
 
     professorTheses.forEach(thesis => {
-        const search = searchTerm.toLowerCase();
-        if (thesis.supervisor?.toLowerCase().includes(search)) professorStats.supervisions++;
-        if (thesis.president?.toLowerCase().includes(search)) professorStats.presidencies++;
-        if (thesis.examiner?.toLowerCase().includes(search)) professorStats.examinations++;
+        if (thesis.supervisor?.trim() === selectedProfessor) professorStats.supervisions++;
+        if (thesis.president?.trim() === selectedProfessor) professorStats.presidencies++;
+        if (thesis.examiner?.trim() === selectedProfessor) professorStats.examinations++;
         professorStats.branches.add(thesis.branch);
         professorStats.specializations.add(thesis.specialization);
     });
@@ -2722,7 +2760,7 @@ function searchProfessorTheses() {
     
     // رأس البطاقة
     html += '<div class="professor-results-header">';
-    html += `<div class="professor-name">👨‍🏫 ${searchTerm}</div>`;
+    html += `<div class="professor-name">👨‍🏫 ${selectedProfessor}</div>`;
     html += `<div class="professor-count">${professorTheses.length} مذكرة</div>`;
     html += '</div>';
 
@@ -2755,11 +2793,10 @@ function searchProfessorTheses() {
     html += '</tr></thead><tbody>';
 
     professorTheses.forEach(thesis => {
-        const search = searchTerm.toLowerCase();
         let role = [];
-        if (thesis.supervisor?.toLowerCase().includes(search)) role.push('مشرف');
-        if (thesis.president?.toLowerCase().includes(search)) role.push('رئيس');
-        if (thesis.examiner?.toLowerCase().includes(search)) role.push('مناقش');
+        if (thesis.supervisor?.trim() === selectedProfessor) role.push('مشرف');
+        if (thesis.president?.trim() === selectedProfessor) role.push('رئيس');
+        if (thesis.examiner?.trim() === selectedProfessor) role.push('مناقش');
 
         html += '<tr>';
         html += `<td><strong>${thesis.thesis_number}</strong></td>`;
@@ -2776,8 +2813,8 @@ function searchProfessorTheses() {
 
     // أزرار الإجراءات
     html += '<div class="professor-actions">';
-    html += `<button onclick="exportProfessorTheses('${searchTerm}')" class="btn btn-primary">📊 تصدير إلى Excel</button>`;
-    html += `<button onclick="printProfessorReport('${searchTerm}')" class="btn btn-secondary">🖨️ طباعة التقرير</button>`;
+    html += `<button onclick="exportProfessorTheses('${selectedProfessor}')" class="btn btn-primary">📊 تصدير إلى Excel</button>`;
+    html += `<button onclick="printProfessorReport('${selectedProfessor}')" class="btn btn-secondary">🖨️ طباعة التقرير</button>`;
     html += '</div>';
 
     html += '</div>';
@@ -2786,15 +2823,14 @@ function searchProfessorTheses() {
 }
 
 function exportProfessorTheses(professorName) {
-    const searchTerm = professorName.toLowerCase();
     const professorTheses = theses.filter(thesis => {
-        const supervisor = thesis.supervisor?.toLowerCase() || '';
-        const president = thesis.president?.toLowerCase() || '';
-        const examiner = thesis.examiner?.toLowerCase() || '';
+        const supervisor = thesis.supervisor?.trim() || '';
+        const president = thesis.president?.trim() || '';
+        const examiner = thesis.examiner?.trim() || '';
 
-        return supervisor.includes(searchTerm) || 
-               president.includes(searchTerm) || 
-               examiner.includes(searchTerm);
+        return supervisor === professorName || 
+               president === professorName || 
+               examiner === professorName;
     });
 
     if (professorTheses.length === 0) {
@@ -2806,11 +2842,10 @@ function exportProfessorTheses(professorName) {
 
     // إعداد البيانات
     const data = professorTheses.map(thesis => {
-        const search = searchTerm;
         let role = [];
-        if (thesis.supervisor?.toLowerCase().includes(search)) role.push('مشرف');
-        if (thesis.president?.toLowerCase().includes(search)) role.push('رئيس');
-        if (thesis.examiner?.toLowerCase().includes(search)) role.push('مناقش');
+        if (thesis.supervisor?.trim() === professorName) role.push('مشرف');
+        if (thesis.president?.trim() === professorName) role.push('رئيس');
+        if (thesis.examiner?.trim() === professorName) role.push('مناقش');
 
         return {
             'رقم المذكرة': thesis.thesis_number,
@@ -2841,15 +2876,14 @@ function exportProfessorTheses(professorName) {
 }
 
 function printProfessorReport(professorName) {
-    const searchTerm = professorName.toLowerCase();
     const professorTheses = theses.filter(thesis => {
-        const supervisor = thesis.supervisor?.toLowerCase() || '';
-        const president = thesis.president?.toLowerCase() || '';
-        const examiner = thesis.examiner?.toLowerCase() || '';
+        const supervisor = thesis.supervisor?.trim() || '';
+        const president = thesis.president?.trim() || '';
+        const examiner = thesis.examiner?.trim() || '';
 
-        return supervisor.includes(searchTerm) || 
-               president.includes(searchTerm) || 
-               examiner.includes(searchTerm);
+        return supervisor === professorName || 
+               president === professorName || 
+               examiner === professorName;
     });
 
     if (professorTheses.length === 0) {
@@ -2860,9 +2894,9 @@ function printProfessorReport(professorName) {
     // جمع الإحصائيات
     let supervisions = 0, presidencies = 0, examinations = 0;
     professorTheses.forEach(thesis => {
-        if (thesis.supervisor?.toLowerCase().includes(searchTerm)) supervisions++;
-        if (thesis.president?.toLowerCase().includes(searchTerm)) presidencies++;
-        if (thesis.examiner?.toLowerCase().includes(searchTerm)) examinations++;
+        if (thesis.supervisor?.trim() === professorName) supervisions++;
+        if (thesis.president?.trim() === professorName) presidencies++;
+        if (thesis.examiner?.trim() === professorName) examinations++;
     });
 
     const printWindow = window.open('', '', 'width=900,height=700');
@@ -2912,9 +2946,9 @@ function printProfessorReport(professorName) {
 
     professorTheses.forEach(thesis => {
         let role = [];
-        if (thesis.supervisor?.toLowerCase().includes(searchTerm)) role.push('مشرف');
-        if (thesis.president?.toLowerCase().includes(searchTerm)) role.push('رئيس');
-        if (thesis.examiner?.toLowerCase().includes(searchTerm)) role.push('مناقش');
+        if (thesis.supervisor?.trim() === professorName) role.push('مشرف');
+        if (thesis.president?.trim() === professorName) role.push('رئيس');
+        if (thesis.examiner?.trim() === professorName) role.push('مناقش');
 
         printWindow.document.write('<tr>');
         printWindow.document.write(`<td>${thesis.thesis_number}</td>`);
@@ -3940,6 +3974,7 @@ window.exportToExcel = exportToExcel;
 window.exportStatistics = exportStatistics;
 window.generatePDFForThesis = generatePDFForThesis;
 window.deleteAllTheses = deleteAllTheses;
+window.searchProfessorTheses = searchProfessorTheses;
 
 // ================================================
 // نظام الجدولة الذكية التلقائية
