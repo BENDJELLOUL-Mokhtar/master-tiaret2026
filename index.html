@@ -210,6 +210,10 @@
                     <span class="icon">📈</span>
                     <span>الإحصائيات</span>
                 </a>
+                <a href="#" onclick="showPage('schedule')" class="nav-item" data-page="schedule">
+                    <span class="icon">🗓️</span>
+                    <span>برنامج المناقشات</span>
+                </a>
             </nav>
         </aside>
 
@@ -688,6 +692,40 @@
                 <!-- الجدول التفصيلي -->
                 <div id="statistics-table-container"></div>
             </div>
+
+            <!-- صفحة برنامج المناقشات -->
+            <div id="schedule" class="page">
+                <div class="page-header">
+                    <h2>🗓️ برنامج المناقشات</h2>
+                    <p class="subtitle" id="schedule-today-label"></p>
+                </div>
+
+                <!-- مؤشر التاريخ - اختيار يوم -->
+                <div class="schedule-date-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+                    <button onclick="scheduleChangeDay(-1)" class="btn btn-secondary">◀ اليوم السابق</button>
+                    <input type="date" id="schedule-date-picker" onchange="schedulePickDate(this.value)"
+                           style="padding:8px 14px;border:1px solid var(--gray-300);border-radius:8px;font-family:Cairo,sans-serif;font-size:1rem;">
+                    <button onclick="scheduleChangeDay(1)" class="btn btn-secondary">اليوم التالي ▶</button>
+                    <button onclick="scheduleGoToday()" class="btn btn-primary">📅 اليوم</button>
+                </div>
+
+                <!-- جدول مناقشات اليوم -->
+                <div class="chart-card" style="margin-bottom:28px;">
+                    <h3 class="chart-title" id="schedule-day-title">📋 مناقشات اليوم</h3>
+                    <div id="schedule-today-table"></div>
+                </div>
+
+                <!-- مخطط الأسبوع الكامل -->
+                <div class="chart-card">
+                    <h3 class="chart-title">📊 مخطط توزيع المناقشات - الأسبوع الكامل</h3>
+                    <div id="schedule-week-label" style="text-align:center;color:var(--gray-600);font-size:0.95rem;margin-bottom:8px;"></div>
+                    <div class="chart-wrapper-lg">
+                        <canvas id="chart-weekly-schedule"></canvas>
+                    </div>
+                    <div id="schedule-week-summary" style="margin-top:20px;"></div>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -714,6 +752,127 @@
                 <button onclick="closeConflictModal()" class="close-btn">&times;</button>
             </div>
             <div class="modal-body" id="conflict-content"></div>
+        </div>
+    </div>
+
+    <!-- نافذة التأجيل السريع -->
+    <div id="postpone-modal" class="modal">
+        <div class="modal-content modal-conflict" style="max-width:620px;">
+            <div class="modal-header">
+                <h3>⏳ تأجيل المناقشة</h3>
+                <button onclick="closePostponeModal()" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="pmodal-thesis-id">
+                <div id="pmodal-thesis-title" style="background:#EDE7F6;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-weight:600;color:#4a148c;font-size:0.95rem;"></div>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="pmodal-reason">سبب التأجيل *</label>
+                        <select id="pmodal-reason" onchange="onPmodalReasonChange()">
+                            <option value="">-- اختر سبب التأجيل --</option>
+                            <option value="غياب الطالب">غياب الطالب</option>
+                            <option value="غياب أحد أعضاء لجنة المناقشة">غياب أحد أعضاء لجنة المناقشة</option>
+                            <option value="مرض الطالب">مرض الطالب</option>
+                            <option value="مرض أحد أعضاء اللجنة">مرض أحد أعضاء اللجنة</option>
+                            <option value="عدم اكتمال المذكرة أو وجود نقائص جوهرية">عدم اكتمال المذكرة أو وجود نقائص جوهرية</option>
+                            <option value="طلب الطالب مهلة إضافية للإعداد">طلب الطالب مهلة إضافية للإعداد</option>
+                            <option value="ظروف طارئة (وفاة أو حادث في عائلة الطالب)">ظروف طارئة (وفاة أو حادث في عائلة الطالب)</option>
+                            <option value="انقطاع الكهرباء أو عطل تقني">انقطاع الكهرباء أو عطل تقني</option>
+                            <option value="تعارض في الجدول الزمني">تعارض في الجدول الزمني</option>
+                            <option value="قرار إداري من القسم">قرار إداري من القسم</option>
+                            <option value="أسباب أخرى">أسباب أخرى (تحديد)</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width" id="pmodal-custom-reason-group" style="display:none;">
+                        <label for="pmodal-custom-reason">تفصيل السبب</label>
+                        <input type="text" id="pmodal-custom-reason" placeholder="اكتب سبب التأجيل بالتفصيل...">
+                    </div>
+                    <div class="form-group">
+                        <label for="pmodal-new-date">التاريخ الجديد للمناقشة</label>
+                        <input type="date" id="pmodal-new-date">
+                    </div>
+                    <div class="form-group">
+                        <label for="pmodal-new-time">التوقيت الجديد</label>
+                        <select id="pmodal-new-time">
+                            <option value="">اختر التوقيت</option>
+                            <option value="09 سا و00 د">09 سا و00 د</option>
+                            <option value="10 سا و15 د">10 سا و15 د</option>
+                            <option value="11 سا و30د">11 سا و30د</option>
+                            <option value="13 سا و15 د">13 سا و15 د</option>
+                            <option value="14 سا و30 د">14 سا و30 د</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="pmodal-new-room">القاعة الجديدة</label>
+                        <select id="pmodal-new-room">
+                            <option value="">نفس القاعة السابقة</option>
+                            <option value="مدرج الوئام">مدرج الوئام</option>
+                            <option value="مدرج المعرفة">مدرج المعرفة</option>
+                            <option value="مدرج المستقبل">مدرج المستقبل</option>
+                            <option value="مدرج السلام">مدرج السلام</option>
+                            <option value="مدرج الأمل">مدرج الأمل</option>
+                            <option value="القاعة 01">القاعة 01</option>
+                            <option value="القاعة 02">القاعة 02</option>
+                            <option value="القاعة 03">القاعة 03</option>
+                            <option value="القاعة 20">القاعة 20</option>
+                            <option value="القاعة 21">القاعة 21</option>
+                            <option value="القاعة 22">القاعة 22</option>
+                            <option value="القاعة 23">القاعة 23</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>لجنة المناقشة في الموعد الجديد</label>
+                        <div class="status-radio-group">
+                            <label class="status-radio-label">
+                                <input type="radio" name="pmodal_committee_radio" id="pmodal-keep-committee" value="keep" checked onchange="onPmodalCommitteeChange()">
+                                <span class="status-radio-opt" style="background:#e8f5e9;color:#27ae60;">✔ نفس اللجنة</span>
+                            </label>
+                            <label class="status-radio-label">
+                                <input type="radio" name="pmodal_committee_radio" id="pmodal-change-committee" value="change" onchange="onPmodalCommitteeChange()">
+                                <span class="status-radio-opt" style="background:#fce4ec;color:#c0392b;">🔄 تغيير اللجنة</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div id="pmodal-new-committee-section" style="display:none; grid-column:1/-1;">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="pmodal-president">رئيس اللجنة الجديد</label>
+                                <input type="text" id="pmodal-president" placeholder="اسم رئيس اللجنة الجديد">
+                            </div>
+                            <div class="form-group">
+                                <label for="pmodal-president-rank">رتبته</label>
+                                <select id="pmodal-president-rank">
+                                    <option value="">اختر الرتبة</option>
+                                    <option value="أستاذ التعليم العالي">أستاذ التعليم العالي</option>
+                                    <option value="أستاذ محاضر أ">أستاذ محاضر أ</option>
+                                    <option value="أستاذ محاضر ب">أستاذ محاضر ب</option>
+                                    <option value="أستاذ مساعد أ">أستاذ مساعد أ</option>
+                                    <option value="أستاذ مساعد ب">أستاذ مساعد ب</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="pmodal-examiner">العضو المناقش الجديد</label>
+                                <input type="text" id="pmodal-examiner" placeholder="اسم العضو المناقش الجديد">
+                            </div>
+                            <div class="form-group">
+                                <label for="pmodal-examiner-rank">رتبته</label>
+                                <select id="pmodal-examiner-rank">
+                                    <option value="">اختر الرتبة</option>
+                                    <option value="أستاذ التعليم العالي">أستاذ التعليم العالي</option>
+                                    <option value="أستاذ محاضر أ">أستاذ محاضر أ</option>
+                                    <option value="أستاذ محاضر ب">أستاذ محاضر ب</option>
+                                    <option value="أستاذ مساعد أ">أستاذ مساعد أ</option>
+                                    <option value="أستاذ مساعد ب">أستاذ مساعد ب</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display:flex;gap:10px;justify-content:flex-end;padding:16px 20px;border-top:1px solid #eee;">
+                <button onclick="savePostponeModal()" class="btn btn-warning">⏳ حفظ التأجيل</button>
+                <button onclick="closePostponeModal()" class="btn btn-secondary">إلغاء</button>
+            </div>
         </div>
     </div>
 
