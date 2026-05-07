@@ -2784,3 +2784,238 @@ tbody td {
         height: 250px;
     }
 }
+
+/* ================================================
+   سبحة الذكر
+================================================ */
+
+/* زر عائم */
+.tasbih-fab {
+    position: fixed;
+    bottom: 32px;
+    left: 32px;
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1B5E20, #2E7D32);
+    color: #fff;
+    font-size: 1.8rem;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(27,94,32,0.5);
+    z-index: 1500;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.tasbih-fab:hover {
+    transform: scale(1.12) rotate(-10deg);
+    box-shadow: 0 6px 24px rgba(27,94,32,0.65);
+}
+
+/* غطاء النافذة */
+.tasbih-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 3000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+
+/* صندوق السبحة */
+.tasbih-box {
+    background: linear-gradient(160deg, #0D3D12 0%, #1B5E20 60%, #2E7D32 100%);
+    border-radius: 24px;
+    padding: 36px 32px 28px;
+    width: 360px;
+    max-width: 95vw;
+    color: #fff;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* زر الإغلاق */
+.tasbih-close {
+    position: absolute;
+    top: 14px;
+    left: 16px;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+.tasbih-close:hover { background: rgba(255,255,255,0.3); }
+
+/* رأس السبحة */
+.tasbih-header { margin-bottom: 16px; }
+.tasbih-moon { font-size: 2.2rem; margin-bottom: 4px; }
+.tasbih-header h2 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+}
+.tasbih-sub {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.7);
+    margin: 4px 0 0;
+}
+
+/* اسم الذكر */
+.tasbih-dhikr-name {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #A5D6A7;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+}
+.tasbih-dhikr-text {
+    font-size: 0.88rem;
+    color: rgba(255,255,255,0.8);
+    line-height: 1.6;
+    min-height: 40px;
+    margin-bottom: 14px;
+    padding: 0 8px;
+}
+
+/* شريط التقدم */
+.tasbih-progress-bar {
+    background: rgba(255,255,255,0.15);
+    border-radius: 20px;
+    height: 8px;
+    margin: 0 auto 6px;
+    width: 80%;
+    overflow: hidden;
+}
+.tasbih-progress-fill {
+    height: 100%;
+    background: #A5D6A7;
+    border-radius: 20px;
+    width: 0%;
+    transition: width 0.25s ease;
+}
+.tasbih-progress-label {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.65);
+    margin-bottom: 20px;
+}
+
+/* حبة السبحة */
+.tasbih-bead {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #4CAF50, #1B5E20);
+    border: 4px solid rgba(255,255,255,0.25);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4), inset 0 -4px 10px rgba(0,0,0,0.3), inset 0 4px 10px rgba(255,255,255,0.15);
+    cursor: pointer;
+    margin: 0 auto 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.tasbih-bead:active {
+    transform: scale(0.93);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5), inset 0 4px 10px rgba(0,0,0,0.3);
+}
+.tasbih-count {
+    font-size: 2.8rem;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+}
+.tasbih-total {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.75);
+    margin-top: 2px;
+}
+
+/* رسالة الاكتمال */
+.tasbih-done {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 0 10px;
+}
+.tasbih-done-icon { font-size: 2.8rem; }
+.tasbih-done p {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #A5D6A7;
+    margin: 0;
+}
+.tasbih-done-sub {
+    font-size: 0.82rem !important;
+    color: rgba(255,255,255,0.7) !important;
+}
+
+/* أزرار التحكم */
+.tasbih-controls { margin-bottom: 20px; }
+.tasbih-btn-reset {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: #fff;
+    padding: 8px 24px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    font-family: 'Cairo', sans-serif;
+    transition: background 0.2s;
+}
+.tasbih-btn-reset:hover { background: rgba(255,255,255,0.22); }
+
+/* مراحل السبحة */
+.tasbih-stages {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.tasbih-stage {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.55);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    transition: all 0.3s;
+}
+.tasbih-stage span {
+    background: rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 1px 6px;
+    font-size: 0.7rem;
+}
+.tasbih-stage.active {
+    background: rgba(165,214,167,0.2);
+    border-color: #A5D6A7;
+    color: #A5D6A7;
+    font-weight: 700;
+}
+.tasbih-stage.done {
+    background: rgba(165,214,167,0.1);
+    border-color: rgba(165,214,167,0.4);
+    color: rgba(165,214,167,0.7);
+    text-decoration: line-through;
+}

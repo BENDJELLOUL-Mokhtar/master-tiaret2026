@@ -40,6 +40,103 @@ function startClock() {
     setInterval(tick, 1000);
 }
 
+// ================================================
+// سبحة الذكر — المذهب المالكي
+// ================================================
+
+const TASBIH_STAGES = [
+    { name: 'سُبْحَانَ اللهِ',   text: 'سُبْحَانَ اللهِ',   max: 33 },
+    { name: 'الحَمْدُ للهِ',     text: 'الحَمْدُ للهِ',     max: 33 },
+    { name: 'اللهُ أَكْبَرُ',    text: 'اللهُ أَكْبَرُ',    max: 33 },
+    {
+        name: 'لا إِلَهَ إِلَّا اللهُ',
+        text: 'لَا إِلَهَ إِلَّا اللهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
+        max: 1
+    }
+];
+
+let tasbihStage   = 0;
+let tasbihCount   = 0;
+let tasbihDone    = false;
+
+function openTasbih() {
+    document.getElementById('tasbih-modal').style.display = 'flex';
+    renderTasbih();
+}
+
+function closeTasbih() {
+    document.getElementById('tasbih-modal').style.display = 'none';
+}
+
+function closeTasbihOnOutside(e) {
+    if (e.target.id === 'tasbih-modal') closeTasbih();
+}
+
+function countTasbih() {
+    if (tasbihDone) return;
+
+    // اهتزاز خفيف إن كان مدعوماً
+    if (navigator.vibrate) navigator.vibrate(30);
+
+    tasbihCount++;
+    const stage = TASBIH_STAGES[tasbihStage];
+
+    if (tasbihCount >= stage.max) {
+        tasbihStage++;
+        tasbihCount = 0;
+        if (tasbihStage >= TASBIH_STAGES.length) {
+            tasbihDone = true;
+        }
+    }
+    renderTasbih();
+}
+
+function resetTasbih() {
+    tasbihStage = 0;
+    tasbihCount = 0;
+    tasbihDone  = false;
+    renderTasbih();
+}
+
+function renderTasbih() {
+    if (tasbihDone) {
+        document.getElementById('tasbih-bead').style.display    = 'none';
+        document.getElementById('tasbih-done').style.display    = 'flex';
+        document.getElementById('tasbih-dhikr-name').textContent = '﴿ اكتملت السبحة ﴾';
+        document.getElementById('tasbih-dhikr-text').textContent = '';
+        document.getElementById('tasbih-progress-fill').style.width = '100%';
+        document.getElementById('tasbih-progress-label').textContent = '100 / 100';
+        // إبراز كل المراحل
+        TASBIH_STAGES.forEach((_, i) => {
+            const el = document.getElementById(`stage-${i}`);
+            if (el) el.classList.add('done');
+        });
+        return;
+    }
+
+    document.getElementById('tasbih-bead').style.display = 'flex';
+    document.getElementById('tasbih-done').style.display = 'none';
+
+    const stage = TASBIH_STAGES[tasbihStage];
+    document.getElementById('tasbih-dhikr-name').textContent  = stage.name;
+    document.getElementById('tasbih-dhikr-text').textContent  = stage.text;
+    document.getElementById('tasbih-count').textContent       = tasbihCount;
+    document.getElementById('tasbih-total').textContent       = `/ ${stage.max}`;
+    document.getElementById('tasbih-progress-label').textContent = `${tasbihCount} / ${stage.max}`;
+
+    const pct = stage.max > 1 ? (tasbihCount / stage.max) * 100 : (tasbihCount * 100);
+    document.getElementById('tasbih-progress-fill').style.width = pct + '%';
+
+    // تلوين مراحل السبحة
+    TASBIH_STAGES.forEach((_, i) => {
+        const el = document.getElementById(`stage-${i}`);
+        if (!el) return;
+        el.classList.remove('active', 'done');
+        if (i < tasbihStage)  el.classList.add('done');
+        if (i === tasbihStage) el.classList.add('active');
+    });
+}
+
 // المستخدمون الافتراضيون
 const DEFAULT_USERS = [
     {

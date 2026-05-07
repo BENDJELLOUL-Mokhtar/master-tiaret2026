@@ -736,6 +736,59 @@
     </div>
     </div> <!-- نهاية المنصة الرئيسية -->
 
+    <!-- زر السبحة العائم -->
+    <button class="tasbih-fab" onclick="openTasbih()" title="سبحة الذكر">📿</button>
+
+    <!-- نافذة السبحة -->
+    <div id="tasbih-modal" class="tasbih-overlay" onclick="closeTasbihOnOutside(event)">
+        <div class="tasbih-box" id="tasbih-box">
+            <button class="tasbih-close" onclick="closeTasbih()">✕</button>
+
+            <!-- العنوان -->
+            <div class="tasbih-header">
+                <div class="tasbih-moon">☪️</div>
+                <h2>سبحة الذكر</h2>
+                <p class="tasbih-sub">على مذهب الإمام مالك رحمه الله</p>
+            </div>
+
+            <!-- الذكر الحالي -->
+            <div class="tasbih-dhikr-name" id="tasbih-dhikr-name">سُبْحَانَ اللهِ</div>
+            <div class="tasbih-dhikr-text" id="tasbih-dhikr-text">سُبْحَانَ اللهِ</div>
+
+            <!-- شريط التقدم -->
+            <div class="tasbih-progress-bar">
+                <div class="tasbih-progress-fill" id="tasbih-progress-fill"></div>
+            </div>
+            <div class="tasbih-progress-label" id="tasbih-progress-label">0 / 33</div>
+
+            <!-- الحبة -->
+            <button class="tasbih-bead" id="tasbih-bead" onclick="countTasbih()">
+                <span class="tasbih-count" id="tasbih-count">0</span>
+                <span class="tasbih-total" id="tasbih-total">/ 33</span>
+            </button>
+
+            <!-- رسالة الاكتمال -->
+            <div class="tasbih-done" id="tasbih-done" style="display:none;">
+                <div class="tasbih-done-icon">✅</div>
+                <p>اكتملت السبحة</p>
+                <p class="tasbih-done-sub">100 ذكر — جزاك الله خيراً</p>
+            </div>
+
+            <!-- أزرار التحكم -->
+            <div class="tasbih-controls">
+                <button class="tasbih-btn-reset" onclick="resetTasbih()">🔄 إعادة</button>
+            </div>
+
+            <!-- الأدوار -->
+            <div class="tasbih-stages">
+                <div class="tasbih-stage" id="stage-0">سبحان الله<span>33</span></div>
+                <div class="tasbih-stage" id="stage-1">الحمد لله<span>33</span></div>
+                <div class="tasbih-stage" id="stage-2">الله أكبر<span>33</span></div>
+                <div class="tasbih-stage" id="stage-3">لا إله إلا الله<span>1</span></div>
+            </div>
+        </div>
+    </div>
+
     <!-- نافذة الجدولة الذكية -->
     <div id="scheduling-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:2000; overflow-y:auto; padding:20px;">
         <div class="sched-modal-box">
