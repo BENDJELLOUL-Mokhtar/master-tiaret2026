@@ -5,6 +5,41 @@
 const USERS_KEY = 'platform_users';
 const CURRENT_USER_KEY = 'current_user';
 
+// ================================================
+// الساعة والتاريخ الميلادي والهجري
+// ================================================
+
+function startClock() {
+    function tick() {
+        const now = new Date();
+
+        // الساعة
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        const timeEl = document.getElementById('clock-time');
+        if (timeEl) timeEl.textContent = `${hh}:${mm}:${ss}`;
+
+        // التاريخ الميلادي بالعربية
+        const gregEl = document.getElementById('clock-date-greg');
+        if (gregEl) {
+            gregEl.textContent = now.toLocaleDateString('ar-DZ', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+        }
+
+        // التاريخ الهجري
+        const hijriEl = document.getElementById('clock-date-hijri');
+        if (hijriEl) {
+            hijriEl.textContent = now.toLocaleDateString('ar-SA-u-ca-islamic', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+        }
+    }
+    tick();
+    setInterval(tick, 1000);
+}
+
 // المستخدمون الافتراضيون
 const DEFAULT_USERS = [
     {
@@ -488,6 +523,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateThesesList();
     setupSearchListener();
     loadProfessorsList();
+    startClock(); // تشغيل الساعة
 });
 
 // ================================================
