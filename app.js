@@ -1921,6 +1921,12 @@ function updateStatisticsPage() {
     const chartDefaults = {
         font: { family: "'Cairo', sans-serif" }
     };
+
+    if (typeof Chart === 'undefined') {
+        // Chart.js لم يُحمَّل — الجدول يظهر فقط
+        return;
+    }
+
     Chart.defaults.font.family = "'Cairo', sans-serif";
 
     // --- رسم 1: الشعب (Doughnut) ---
@@ -1992,8 +1998,6 @@ function updateStatisticsPage() {
             }
         });
     }
-
-    const top10 = stats.slice(0, 10);
 
     // --- رسم 3: أعلى 10 أساتذة (Bar أفقي) ---
     const ctxProf = document.getElementById('chart-professors')?.getContext('2d');
@@ -2078,7 +2082,7 @@ function updateStatisticsPage() {
         });
     }
 
-    // --- الجدول التفصيلي ---
+    // --- الجدول التفصيلي (يُرسم أولاً دائماً) ---
     let html = '';
     ALL_SPECIALIZATIONS.forEach(spec => {
         const specTheses = data.filter(t => t.specialization === spec);
@@ -2088,7 +2092,7 @@ function updateStatisticsPage() {
         html += '<div class="table-container" style="margin-bottom:24px;"><table>';
         html += '<thead><tr><th>الأستاذ</th><th>الإشرافات</th><th>الرئاسات</th><th>العضويات</th><th>المجموع</th></tr></thead><tbody>';
 
-        getStatsBySpecialization(spec).forEach(prof => {
+        getStatsBySpecializationFromData(data, spec).forEach(prof => {
             html += `<tr>
                 <td>${prof.name}</td>
                 <td><span class="role-pill sup">${prof.supervisions}</span></td>
@@ -2100,13 +2104,25 @@ function updateStatisticsPage() {
 
         html += '</tbody></table></div>';
     });
+    container.innerHTML = html || '<div class="empty-state"><div class="empty-state-icon">📊</div><h3>لا توجد بيانات كافية</h3></div>';
 
-    container.innerHTML = html;
+    // --- الرسوم البيانية (محمية من أخطاء CDN) ---
+    if (typeof Chart === 'undefined') return;
+
+    try {
+        Chart.defaults.font.family = "'Cairo', sans-serif";
+    } catch(e) { return; }
+
+    const top10 = stats.slice(0, 10);
 }
 
 function getStatsBySpecialization(specialization) {
+    return getStatsBySpecializationFromData(theses, specialization);
+}
+
+function getStatsBySpecializationFromData(data, specialization) {
     const stats = {};
-    const specTheses = theses.filter(t => t.specialization === specialization);
+    const specTheses = data.filter(t => t.specialization === specialization);
 
     specTheses.forEach(thesis => {
         if (thesis.supervisor) {
