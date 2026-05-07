@@ -3553,6 +3553,14 @@ function buildProfConstraintsUI() {
                     <input type="checkbox" class="c-consecutive" ${c.consecutiveDays ? 'checked' : ''}>
                     <span>🔗 يشترط أيام متتالية — تجميع جلساته في أيام متقاربة قدر الإمكان</span>
                 </label>
+                <label class="constraint-check">
+                    <input type="checkbox" class="c-two-days" ${c.twoDaysOnly ? 'checked' : ''}>
+                    <span>📅 يومين متتابعين فقط — تُحجز جميع جلساته في يومين متتاليين بالضبط</span>
+                </label>
+                <div class="constraint-row c-two-days-row" style="display:${c.twoDaysOnly ? 'flex' : 'none'}">
+                    <label>📅 اليوم الأول المفضل:</label>
+                    <input type="date" class="c-two-days-start" value="${c.twoDaysStart || ''}">
+                </div>
                 <div class="constraint-row">
                     <label>⏰ الوقت المفضل:</label>
                     <select class="c-time-pref">
@@ -3573,6 +3581,14 @@ function buildProfConstraintsUI() {
             </div>
         </div>`;
     }).join('');
+
+    // إظهار/إخفاء حقل تاريخ اليومين عند تغيير الخيار
+    container.querySelectorAll('.c-two-days').forEach(cb => {
+        cb.addEventListener('change', function() {
+            const row = this.closest('.prof-constraint-body').querySelector('.c-two-days-row');
+            if (row) row.style.display = this.checked ? 'flex' : 'none';
+        });
+    });
 }
 
 function saveConstraintsFromUI() {
@@ -3581,8 +3597,12 @@ function saveConstraintsFromUI() {
     cards.forEach(card => {
         const prof = card.dataset.prof;
         const unavailStr = card.querySelector('.c-unavail').value;
+        const twoDays    = card.querySelector('.c-two-days').checked;
+        const twoDaysStart = card.querySelector('.c-two-days-start').value;
         constraints[prof] = {
             consecutiveDays: card.querySelector('.c-consecutive').checked,
+            twoDaysOnly:     twoDays,
+            twoDaysStart:    twoDays && twoDaysStart ? twoDaysStart : '',
             preferredTime:   card.querySelector('.c-time-pref').value,
             maxPerDay:       parseInt(card.querySelector('.c-max-day').value) || 3,
             unavailableDates: unavailStr ? unavailStr.split(',').map(d => d.trim()).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) : []
@@ -3711,20 +3731,59 @@ function daysDiffSched(d1, d2) {
 function findBestSlot(thesis, availableDates, rooms, constraints, roomOcc, profOcc, profDays, maxProfPerDay) {
     const professors = [thesis.supervisor, thesis.president, thesis.examiner].filter(Boolean);
 
+    // بناء قائمة التواريخ المسموحة لكل أستاذ يشترط يومين متتابعين
+    const twoDay = {}; // prof → [day1, day2] أو null
+    for (const prof of professors) {
+        const c = constraints[prof] || {};
+        if (!c.twoDaysOnly) continue;
+        if (profDays[prof] && profDays[prof].size >= 2) {
+            // الأستاذ استُخدم يومان مسبقاً → قيّده عليهما
+            twoDay[prof] = Array.from(profDays[prof]).sort().slice(0, 2);
+        } else if (profDays[prof] && profDays[prof].size === 1) {
+            const first = Array.from(profDays[prof])[0];
+            // اليوم الأول محدد → اليوم الثاني هو اليوم التالي
+            const next = new Date(first + 'T00:00:00');
+            next.setDate(next.getDate() + 1);
+            twoDay[prof] = [first, next.toISOString().split('T')[0]];
+        } else if (c.twoDaysStart) {
+            // الأستاذ حدد تاريخ البداية
+            const d1 = c.twoDaysStart;
+            const d2obj = new Date(d1 + 'T00:00:00');
+            d2obj.setDate(d2obj.getDate() + 1);
+            twoDay[prof] = [d1, d2obj.toISOString().split('T')[0]];
+        }
+        // إذا لم يُحدد تاريخ → سيُختار أول فرصة ويُقيَّد عليها
+    }
+
     // نُحسب درجة جاذبية كل تاريخ
     const scoredDates = availableDates.map(date => {
         let score = 0;
         for (const prof of professors) {
             const c = constraints[prof] || {};
+
             // تاريخ محظور → عقوبة كبيرة
             if (c.unavailableDates && c.unavailableDates.includes(date)) return { date, score: -99999 };
-            // مكافأة الأيام المتتالية
+
+            // يومين متتابعين فقط
+            if (c.twoDaysOnly) {
+                const allowed = twoDay[prof];
+                if (allowed) {
+                    // إذا التاريخ ليس في اليومين المسموحين → مستحيل
+                    if (!allowed.includes(date)) return { date, score: -99999 };
+                    score += 20; // مكافأة للتوافق
+                } else {
+                    // لا يزال يُنشئ يومه الأول: أي تاريخ مقبول، لكن نفضّل البداية المبكرة
+                    score += 5;
+                }
+            }
+
+            // مكافأة الأيام المتتالية (consecutiveDays)
             if (c.consecutiveDays && profDays[prof] && profDays[prof].size > 0) {
-                const sorted = Array.from(profDays[prof]).sort();
-                const lastDate = sorted[sorted.length - 1];
+                const sortedD = Array.from(profDays[prof]).sort();
+                const lastDate = sortedD[sortedD.length - 1];
                 const diff = daysDiffSched(lastDate, date);
-                if (diff === 0)      score += 8;   // نفس اليوم
-                else if (diff === 1) score += 15;  // يوم متتالي ← الأمثل
+                if (diff === 0)      score += 8;
+                else if (diff === 1) score += 15;
                 else if (diff === 2) score += 4;
                 else score -= Math.min(diff, 10);
             }
