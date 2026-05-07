@@ -777,6 +777,9 @@ function showPage(pageId) {
         case 'statistics':
             updateStatisticsPage();
             break;
+        case 'schedule':
+            updateSchedulePage();
+            break;
         case 'add-thesis':
             if (editingThesisId) {
                 loadThesisForEdit(editingThesisId);
@@ -3973,3 +3976,295 @@ window.toggleFilterPanel = toggleFilterPanel;
 window.onFilterChange = onFilterChange;
 window.selectAllFilter = selectAllFilter;
 window.clearSingleFilter = clearSingleFilter;
+
+// ================================================
+// صفحة برنامج المناقشات
+// ================================================
+
+// المتغير الحالي للتاريخ المحدد في صفحة البرنامج
+let scheduleCurrentDate = new Date();
+// مرجع المخطط الأسبوعي
+let weeklyScheduleChart = null;
+
+// دخول الصفحة: تحديث كل شيء
+function updateSchedulePage() {
+    const picker = document.getElementById('schedule-date-picker');
+    if (picker && !picker.value) {
+        picker.value = toISODate(scheduleCurrentDate);
+    }
+    renderTodaySchedule();
+    renderWeeklyChart();
+}
+
+// تحويل Date إلى YYYY-MM-DD
+function toISODate(d) {
+    return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+}
+
+// تنسيق تاريخ عربي كامل
+function formatArabicDate(isoDate) {
+    const d = new Date(isoDate + 'T00:00:00');
+    return d.toLocaleDateString('ar-DZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// زر اليوم الحالي
+function scheduleGoToday() {
+    scheduleCurrentDate = new Date();
+    const picker = document.getElementById('schedule-date-picker');
+    if (picker) picker.value = toISODate(scheduleCurrentDate);
+    renderTodaySchedule();
+    renderWeeklyChart();
+}
+
+// زر التنقل بين الأيام
+function scheduleChangeDay(delta) {
+    scheduleCurrentDate.setDate(scheduleCurrentDate.getDate() + delta);
+    const picker = document.getElementById('schedule-date-picker');
+    if (picker) picker.value = toISODate(scheduleCurrentDate);
+    renderTodaySchedule();
+    renderWeeklyChart();
+}
+
+// اختيار يوم من حقل التاريخ
+function schedulePickDate(value) {
+    if (!value) return;
+    scheduleCurrentDate = new Date(value + 'T00:00:00');
+    renderTodaySchedule();
+    renderWeeklyChart();
+}
+
+// عرض جدول مناقشات اليوم المحدد
+function renderTodaySchedule() {
+    const selectedISO = toISODate(scheduleCurrentDate);
+    const todayISO    = toISODate(new Date());
+    const isToday     = selectedISO === todayISO;
+
+    // تسميات
+    const arabicDate = formatArabicDate(selectedISO);
+    const labelEl = document.getElementById('schedule-today-label');
+    const titleEl = document.getElementById('schedule-day-title');
+    if (labelEl) labelEl.textContent = arabicDate;
+    if (titleEl) titleEl.textContent = isToday
+        ? `📋 مناقشات اليوم — ${arabicDate}`
+        : `📋 مناقشات يوم — ${arabicDate}`;
+
+    // فلترة المذكرات التي لها تاريخ مناقشة = اليوم المحدد
+    const dayTheses = theses.filter(t => t.defense_date === selectedISO)
+        .sort((a, b) => (a.defense_time || '').localeCompare(b.defense_time || ''));
+
+    const container = document.getElementById('schedule-today-table');
+    if (!container) return;
+
+    if (dayTheses.length === 0) {
+        container.innerHTML = `<div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <h3>لا توجد مناقشات مجدولة لهذا اليوم</h3>
+            <p>يمكنك تحديد تاريخ المناقشة عند إضافة أو تعديل المذكرة</p>
+        </div>`;
+        return;
+    }
+
+    let html = `<div class="table-container"><table>
+        <thead><tr>
+            <th>#</th>
+            <th>الوقت</th>
+            <th>القاعة</th>
+            <th>موضوع المذكرة</th>
+            <th>الطالب</th>
+            <th>المشرف</th>
+            <th>الرئيس</th>
+            <th>المناقش</th>
+            <th>التخصص</th>
+            <th>إجراءات</th>
+        </tr></thead><tbody>`;
+
+    dayTheses.forEach((thesis, idx) => {
+        const students = thesis.student2
+            ? `${thesis.student1} / ${thesis.student2}`
+            : thesis.student1;
+        html += `<tr>
+            <td>${idx + 1}</td>
+            <td><span class="badge badge-info">${thesis.defense_time || '-'}</span></td>
+            <td><span class="badge badge-primary">${thesis.room || '-'}</span></td>
+            <td style="max-width:220px">${truncateText(thesis.title, 70)}</td>
+            <td>${students}</td>
+            <td>${thesis.supervisor}</td>
+            <td>${thesis.president}</td>
+            <td>${thesis.examiner}</td>
+            <td><span class="badge ${specBadgeClass(thesis.specialization)}">${thesis.specialization}</span></td>
+            <td>
+                <button onclick="generatePDFForThesis('${thesis.id}')" class="btn btn-primary btn-sm">🖨️ طباعة</button>
+                ${hasPermission('edit') ? `<button onclick="editThesis('${thesis.id}')" class="btn btn-info btn-sm">✏️ تعديل</button>` : ''}
+            </td>
+        </tr>`;
+    });
+
+    html += `</tbody></table></div>
+        <div style="margin-top:10px;color:var(--gray-600);font-size:0.9rem;">
+            إجمالي مناقشات هذا اليوم: <strong>${dayTheses.length}</strong>
+        </div>`;
+    container.innerHTML = html;
+}
+
+// رسم مخطط الأسبوع الكامل (7 أيام تبدأ من السبت)
+function renderWeeklyChart() {
+    // تحديد بداية ونهاية الأسبوع (السبت → الجمعة)
+    const ref = new Date(scheduleCurrentDate);
+    const dow = ref.getDay(); // 0=الأحد، 6=السبت
+    // السبت = 6، نريد ان يكون أول يوم
+    const diffToSat = (dow - 6 + 7) % 7;
+    const weekStart = new Date(ref);
+    weekStart.setDate(ref.getDate() - diffToSat);
+
+    const dayNames  = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+    const labels    = [];
+    const counts    = [];
+    const colors    = [];
+    const weekDates = [];
+    const todayISO  = toISODate(new Date());
+    const selectedISO = toISODate(scheduleCurrentDate);
+
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(weekStart);
+        d.setDate(weekStart.getDate() + i);
+        const iso = toISODate(d);
+        weekDates.push(iso);
+        const count = theses.filter(t => t.defense_date === iso).length;
+        labels.push(dayNames[i]);
+        counts.push(count);
+        // لون خاص لليوم الحالي وليوم المحدد
+        if (iso === todayISO && iso === selectedISO) {
+            colors.push('rgba(46, 204, 113, 0.85)');
+        } else if (iso === todayISO) {
+            colors.push('rgba(46, 204, 113, 0.65)');
+        } else if (iso === selectedISO) {
+            colors.push('rgba(52, 152, 219, 0.85)');
+        } else {
+            colors.push('rgba(155, 89, 182, 0.55)');
+        }
+    }
+
+    // تسمية الأسبوع
+    const weekLabelEl = document.getElementById('schedule-week-label');
+    if (weekLabelEl) {
+        weekLabelEl.textContent = `الأسبوع من ${formatArabicDate(weekDates[0])} إلى ${formatArabicDate(weekDates[6])}`;
+    }
+
+    // رسم المخطط
+    const canvas = document.getElementById('chart-weekly-schedule');
+    if (!canvas) return;
+    if (weeklyScheduleChart) {
+        weeklyScheduleChart.destroy();
+        weeklyScheduleChart = null;
+    }
+    weeklyScheduleChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'عدد المناقشات',
+                data: counts,
+                backgroundColor: colors,
+                borderColor: colors.map(c => c.replace(/[\d.]+\)$/, '1)')),
+                borderWidth: 2,
+                borderRadius: 8,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => {
+                            const idx = items[0].dataIndex;
+                            return `${dayNames[idx]} — ${formatArabicDate(weekDates[idx])}`;
+                        },
+                        label: (item) => ` ${item.raw} مناقشة`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0,
+                        font: { family: 'Cairo' }
+                    },
+                    grid: { color: 'rgba(0,0,0,0.06)' }
+                },
+                x: {
+                    ticks: { font: { family: 'Cairo', size: 13 } },
+                    grid: { display: false }
+                }
+            },
+            onClick: (evt, elements) => {
+                if (elements.length > 0) {
+                    const idx = elements[0].index;
+                    schedulePickDate(weekDates[idx]);
+                    const picker = document.getElementById('schedule-date-picker');
+                    if (picker) picker.value = weekDates[idx];
+                }
+            }
+        }
+    });
+
+    // جدول ملخص الأسبوع
+    renderWeekSummary(weekDates, dayNames, counts);
+}
+
+// جدول ملخص الأسبوع تحت المخطط
+function renderWeekSummary(weekDates, dayNames, counts) {
+    const container = document.getElementById('schedule-week-summary');
+    if (!container) return;
+
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (total === 0) {
+        container.innerHTML = '<p style="text-align:center;color:var(--gray-500);font-size:0.9rem;">لا توجد مناقشات مجدولة هذا الأسبوع</p>';
+        return;
+    }
+
+    const todayISO = toISODate(new Date());
+    let html = `<div class="table-container"><table>
+        <thead><tr>
+            <th>اليوم</th><th>التاريخ</th><th>عدد المناقشات</th><th>التفاصيل</th>
+        </tr></thead><tbody>`;
+
+    weekDates.forEach((iso, i) => {
+        if (counts[i] === 0) return;
+        const isToday = iso === todayISO;
+        const rowStyle = isToday ? 'background:rgba(46,204,113,0.08);font-weight:600;' : '';
+        html += `<tr style="${rowStyle}">
+            <td>${dayNames[i]}${isToday ? ' <span class="badge badge-success">اليوم</span>' : ''}</td>
+            <td>${formatArabicDate(iso)}</td>
+            <td><span class="badge badge-primary">${counts[i]}</span></td>
+            <td><button onclick="schedulePickDate('${iso}');document.getElementById('schedule-date-picker').value='${iso}';" class="btn btn-secondary btn-sm">👁️ عرض</button></td>
+        </tr>`;
+    });
+
+    html += `</tbody><tfoot><tr>
+        <td colspan="2"><strong>إجمالي الأسبوع</strong></td>
+        <td colspan="2"><span class="badge badge-info">${total} مناقشة</span></td>
+    </tr></tfoot></table></div>`;
+    container.innerHTML = html;
+}
+
+window.updateSchedulePage  = updateSchedulePage;
+window.scheduleGoToday     = scheduleGoToday;
+window.scheduleChangeDay   = scheduleChangeDay;
+window.schedulePickDate    = schedulePickDate;
+
+// إرجاع كلاس الشارة حسب التخصص
+function specBadgeClass(spec) {
+    const map = {
+        'لسانيات الخطاب':    'badge-spec-linguistics',
+        'تعليمية اللغات':    'badge-spec-teaching',
+        'أدب حديث ومعاصر':  'badge-spec-literature',
+        'نقد حديث ومعاصر':  'badge-spec-criticism'
+    };
+    return map[spec] || 'badge-warning';
+}
