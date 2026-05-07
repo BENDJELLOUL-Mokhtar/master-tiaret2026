@@ -294,21 +294,83 @@
                     <div class="search-box">
                         <input type="text" id="search-input" placeholder="🔍 البحث في المذكرات (موضوع، طالب، أستاذ...)">
                     </div>
-                    <div class="filter-group">
-                        <select id="filter-branch" onchange="applyFilters()">
-                            <option value="">كل الشعب</option>
-                            <option value="دراسات لغوية">دراسات لغوية</option>
-                            <option value="دراسات أدبية">دراسات أدبية</option>
-                            <option value="دراسات نقدية">دراسات نقدية</option>
-                        </select>
-                        <select id="filter-specialization" onchange="applyFilters()">
-                            <option value="">كل التخصصات</option>
-                            <option value="لسانيات الخطاب">لسانيات الخطاب</option>
-                            <option value="تعليمية اللغات">تعليمية اللغات</option>
-                            <option value="أدب حديث ومعاصر">أدب حديث ومعاصر</option>
-                            <option value="نقد حديث ومعاصر">نقد حديث ومعاصر</option>
-                        </select>
-                        <button onclick="clearFilters()" class="btn btn-secondary">🔄 مسح الفلتر</button>
+                    <div class="advanced-filters">
+                        <!-- فلتر المشرف -->
+                        <div class="multi-filter-group">
+                            <button class="multi-filter-btn" onclick="toggleFilterPanel('filter-supervisor-panel')">
+                                <span>👨‍🏫 المشرف</span>
+                                <span class="filter-badge" id="badge-supervisor" style="display:none">0</span>
+                                <span class="arrow-icon">▼</span>
+                            </button>
+                            <div class="filter-panel" id="filter-supervisor-panel">
+                                <div class="filter-panel-header">
+                                    <button onclick="selectAllFilter('supervisor')" class="filter-ctrl-btn">تحديد الكل</button>
+                                    <button onclick="clearSingleFilter('supervisor')" class="filter-ctrl-btn">مسح</button>
+                                </div>
+                                <div class="filter-checkboxes" id="filter-supervisor-list"></div>
+                            </div>
+                        </div>
+                        <!-- فلتر الرئيس -->
+                        <div class="multi-filter-group">
+                            <button class="multi-filter-btn" onclick="toggleFilterPanel('filter-president-panel')">
+                                <span>🎓 الرئيس</span>
+                                <span class="filter-badge" id="badge-president" style="display:none">0</span>
+                                <span class="arrow-icon">▼</span>
+                            </button>
+                            <div class="filter-panel" id="filter-president-panel">
+                                <div class="filter-panel-header">
+                                    <button onclick="selectAllFilter('president')" class="filter-ctrl-btn">تحديد الكل</button>
+                                    <button onclick="clearSingleFilter('president')" class="filter-ctrl-btn">مسح</button>
+                                </div>
+                                <div class="filter-checkboxes" id="filter-president-list"></div>
+                            </div>
+                        </div>
+                        <!-- فلتر المناقش -->
+                        <div class="multi-filter-group">
+                            <button class="multi-filter-btn" onclick="toggleFilterPanel('filter-examiner-panel')">
+                                <span>📋 المناقش</span>
+                                <span class="filter-badge" id="badge-examiner" style="display:none">0</span>
+                                <span class="arrow-icon">▼</span>
+                            </button>
+                            <div class="filter-panel" id="filter-examiner-panel">
+                                <div class="filter-panel-header">
+                                    <button onclick="selectAllFilter('examiner')" class="filter-ctrl-btn">تحديد الكل</button>
+                                    <button onclick="clearSingleFilter('examiner')" class="filter-ctrl-btn">مسح</button>
+                                </div>
+                                <div class="filter-checkboxes" id="filter-examiner-list"></div>
+                            </div>
+                        </div>
+                        <!-- فلتر الشعبة -->
+                        <div class="multi-filter-group">
+                            <button class="multi-filter-btn" onclick="toggleFilterPanel('filter-branch-panel')">
+                                <span>📁 الشعبة</span>
+                                <span class="filter-badge" id="badge-branch" style="display:none">0</span>
+                                <span class="arrow-icon">▼</span>
+                            </button>
+                            <div class="filter-panel" id="filter-branch-panel">
+                                <div class="filter-panel-header">
+                                    <button onclick="selectAllFilter('branch')" class="filter-ctrl-btn">تحديد الكل</button>
+                                    <button onclick="clearSingleFilter('branch')" class="filter-ctrl-btn">مسح</button>
+                                </div>
+                                <div class="filter-checkboxes" id="filter-branch-list"></div>
+                            </div>
+                        </div>
+                        <!-- فلتر التخصص -->
+                        <div class="multi-filter-group">
+                            <button class="multi-filter-btn" onclick="toggleFilterPanel('filter-specialization-panel')">
+                                <span>🎯 التخصص</span>
+                                <span class="filter-badge" id="badge-specialization" style="display:none">0</span>
+                                <span class="arrow-icon">▼</span>
+                            </button>
+                            <div class="filter-panel" id="filter-specialization-panel">
+                                <div class="filter-panel-header">
+                                    <button onclick="selectAllFilter('specialization')" class="filter-ctrl-btn">تحديد الكل</button>
+                                    <button onclick="clearSingleFilter('specialization')" class="filter-ctrl-btn">مسح</button>
+                                </div>
+                                <div class="filter-checkboxes" id="filter-specialization-list"></div>
+                            </div>
+                        </div>
+                        <button onclick="clearFilters()" class="btn btn-secondary">🔄 مسح الكل</button>
                     </div>
                 </div>
 

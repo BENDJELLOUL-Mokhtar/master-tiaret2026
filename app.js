@@ -540,7 +540,8 @@ function showPage(pageId) {
             updateDashboard();
             break;
         case 'theses-list':
-            updateThesesList();
+            buildFilterPanels();
+            applyFilters();
             break;
         case 'professors':
             updateProfessorsPage();
@@ -788,36 +789,187 @@ function setupSearchListener() {
     }
 }
 
+// ================================================
+// الفلاتر المتقدمة متعددة الاختيار
+// ================================================
+
+// حالة الفلاتر المحددة
+const activeFilters = {
+    supervisor: new Set(),
+    president: new Set(),
+    examiner: new Set(),
+    branch: new Set(),
+    specialization: new Set()
+};
+
+// الفتح/الإغلاق للوحة فلتر معين
+function toggleFilterPanel(panelId) {
+    const panel = document.getElementById(panelId);
+    const btn = panel.previousElementSibling;
+    const isOpen = panel.classList.contains('open');
+
+    // أغلق كل اللوحات الأخرى
+    document.querySelectorAll('.filter-panel.open').forEach(p => {
+        p.classList.remove('open');
+        p.previousElementSibling.classList.remove('open');
+    });
+
+    if (!isOpen) {
+        panel.classList.add('open');
+        btn.classList.add('open');
+    }
+}
+
+// إغلاق كل اللوحات عند الضغط خارجها
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.multi-filter-group')) {
+        document.querySelectorAll('.filter-panel.open').forEach(p => {
+            p.classList.remove('open');
+            p.previousElementSibling.classList.remove('open');
+        });
+    }
+});
+
+// بناء قوائم الفلاتر من البيانات الفعلية
+function buildFilterPanels() {
+    const visibleTheses = getVisibleThesesForUser();
+
+    const fields = {
+        supervisor: { id: 'filter-supervisor-list', key: 'supervisor' },
+        president:  { id: 'filter-president-list',  key: 'president' },
+        examiner:   { id: 'filter-examiner-list',   key: 'examiner' },
+        branch:     { id: 'filter-branch-list',      key: 'branch' },
+        specialization: { id: 'filter-specialization-list', key: 'specialization' }
+    };
+
+    Object.entries(fields).forEach(([filterKey, cfg]) => {
+        const container = document.getElementById(cfg.id);
+        if (!container) return;
+
+        // جمع القيم الفريدة وعدد ظهورها
+        const counts = {};
+        visibleTheses.forEach(t => {
+            const val = t[cfg.key];
+            if (val && val.trim()) {
+                counts[val] = (counts[val] || 0) + 1;
+            }
+        });
+
+        const values = Object.keys(counts).sort((a, b) => a.localeCompare(b, 'ar'));
+
+        if (values.length === 0) {
+            container.innerHTML = '<div style="padding:10px;color:#999;font-size:0.85rem;text-align:center;">لا توجد بيانات</div>';
+            return;
+        }
+
+        container.innerHTML = values.map(val => {
+            const checked = activeFilters[filterKey].has(val) ? 'checked' : '';
+            const safeId = `chk-${filterKey}-${val.replace(/\s+/g, '-')}`;
+            return `<label class="filter-check-item">
+                <input type="checkbox" id="${safeId}" value="${val}" ${checked}
+                    onchange="onFilterChange('${filterKey}', this)">
+                <label for="${safeId}">${val}</label>
+                <span class="filter-count-chip">${counts[val]}</span>
+            </label>`;
+        }).join('');
+    });
+}
+
+// الحصول على المذكرات المسموح للمستخدم برؤيتها (بدون فلاتر)
+function getVisibleThesesForUser() {
+    const user = getCurrentUser();
+    if (!user) return theses;
+    return theses.filter(t => {
+        if (user.role === 'professor') {
+            return t.supervisor === user.professorName ||
+                   t.president === user.professorName ||
+                   t.examiner === user.professorName;
+        }
+        if (user.role === 'student') {
+            return t.student1 === user.studentName || t.student2 === user.studentName;
+        }
+        if (user.role === 'branch_head') return t.branch === user.branch;
+        if (user.role === 'specialization_head') return t.specialization === user.specialization;
+        return true;
+    });
+}
+
+// عند تغيير أي checkbox
+function onFilterChange(filterKey, checkbox) {
+    if (checkbox.checked) {
+        activeFilters[filterKey].add(checkbox.value);
+    } else {
+        activeFilters[filterKey].delete(checkbox.value);
+    }
+    updateFilterBadges();
+    applyFilters();
+}
+
+// تحديث الشارات (أعداد المحددات)
+function updateFilterBadges() {
+    ['supervisor', 'president', 'examiner', 'branch', 'specialization'].forEach(key => {
+        const badge = document.getElementById(`badge-${key}`);
+        const btn   = badge?.closest('.multi-filter-btn');
+        const count = activeFilters[key].size;
+        if (!badge) return;
+        if (count > 0) {
+            badge.textContent = count;
+            badge.style.display = 'inline-flex';
+            btn?.classList.add('active');
+        } else {
+            badge.style.display = 'none';
+            btn?.classList.remove('active');
+        }
+    });
+}
+
+// تحديد الكل في فلتر
+function selectAllFilter(filterKey) {
+    const container = document.getElementById(`filter-${filterKey}-list`);
+    if (!container) return;
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = true;
+        activeFilters[filterKey].add(cb.value);
+    });
+    updateFilterBadges();
+    applyFilters();
+}
+
+// مسح فلتر واحد
+function clearSingleFilter(filterKey) {
+    const container = document.getElementById(`filter-${filterKey}-list`);
+    if (!container) return;
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+    });
+    activeFilters[filterKey].clear();
+    updateFilterBadges();
+    applyFilters();
+}
+
 function applyFilters() {
     const searchTerm = document.getElementById('search-input')?.value.toLowerCase() || '';
-    const branchFilter = document.getElementById('filter-branch')?.value || '';
-    const specializationFilter = document.getElementById('filter-specialization')?.value || '';
     const user = getCurrentUser();
 
     filteredTheses = theses.filter(thesis => {
         // فلترة حسب دور المستخدم
         if (user) {
             if (user.role === 'professor') {
-                // الأستاذ يرى فقط المذكرات التي شارك فيها
                 const participates = 
                     thesis.supervisor === user.professorName ||
                     thesis.president === user.professorName ||
                     thesis.examiner === user.professorName;
                 if (!participates) return false;
             } else if (user.role === 'student') {
-                // الطالب يرى فقط مذكرته
                 const isHisThesis = 
                     thesis.student1 === user.studentName ||
                     thesis.student2 === user.studentName;
                 if (!isHisThesis) return false;
             } else if (user.role === 'branch_head') {
-                // رئيس الشعبة يرى فقط مذكرات شعبته
                 if (thesis.branch !== user.branch) return false;
             } else if (user.role === 'specialization_head') {
-                // رئيس التخصص يرى فقط مذكرات تخصصه
                 if (thesis.specialization !== user.specialization) return false;
             }
-            // field_head و admin و head و deputy يرون كل شيء (لا فلترة)
         }
 
         // البحث النصي
@@ -830,13 +982,15 @@ function applyFilters() {
             thesis.examiner.toLowerCase().includes(searchTerm) ||
             thesis.thesis_number.toLowerCase().includes(searchTerm);
 
-        // فلتر الشعبة
-        const matchesBranch = !branchFilter || thesis.branch === branchFilter;
+        // الفلاتر المتعددة
+        const matchesSupervisor     = activeFilters.supervisor.size === 0     || activeFilters.supervisor.has(thesis.supervisor);
+        const matchesPresident      = activeFilters.president.size === 0      || activeFilters.president.has(thesis.president);
+        const matchesExaminer       = activeFilters.examiner.size === 0       || activeFilters.examiner.has(thesis.examiner);
+        const matchesBranch         = activeFilters.branch.size === 0         || activeFilters.branch.has(thesis.branch);
+        const matchesSpecialization = activeFilters.specialization.size === 0 || activeFilters.specialization.has(thesis.specialization);
 
-        // فلتر التخصص
-        const matchesSpecialization = !specializationFilter || thesis.specialization === specializationFilter;
-
-        return matchesSearch && matchesBranch && matchesSpecialization;
+        return matchesSearch && matchesSupervisor && matchesPresident &&
+               matchesExaminer && matchesBranch && matchesSpecialization;
     });
 
     currentPage = 1;
@@ -844,9 +998,18 @@ function applyFilters() {
 }
 
 function clearFilters() {
-    document.getElementById('search-input').value = '';
-    document.getElementById('filter-branch').value = '';
-    document.getElementById('filter-specialization').value = '';
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
+
+    // مسح كل الفلاتر
+    ['supervisor', 'president', 'examiner', 'branch', 'specialization'].forEach(key => {
+        activeFilters[key].clear();
+        const container = document.getElementById(`filter-${key}-list`);
+        if (container) {
+            container.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        }
+    });
+    updateFilterBadges();
     applyFilters();
 }
 
@@ -2892,3 +3055,7 @@ window.exportToExcel = exportToExcel;
 window.exportStatistics = exportStatistics;
 window.generatePDFForThesis = generatePDFForThesis;
 window.deleteAllTheses = deleteAllTheses;
+window.toggleFilterPanel = toggleFilterPanel;
+window.onFilterChange = onFilterChange;
+window.selectAllFilter = selectAllFilter;
+window.clearSingleFilter = clearSingleFilter;
