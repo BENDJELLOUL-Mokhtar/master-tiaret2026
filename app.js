@@ -863,6 +863,7 @@ function displayRecentTheses() {
     html += '<th>التاريخ</th>';
     html += '<th>التوقيت</th>';
     html += '<th>القاعة</th>';
+    html += '<th>الحالة</th>';
     html += '<th>إجراءات</th>';
     html += '</tr></thead><tbody>';
 
@@ -874,19 +875,24 @@ function displayRecentTheses() {
         html += `<td>${thesis.supervisor}</td>`;
         html += `<td>${thesis.president}</td>`;
         html += `<td>${thesis.examiner}</td>`;
-        html += `<td><span class="badge badge-primary">${thesis.specialization}</span></td>`;
+        html += `<td><span class="badge ${specBadgeClass(thesis.specialization)}">${thesis.specialization}</span></td>`;
         html += `<td>${thesis.defense_date || '-'}</td>`;
         html += `<td>${thesis.defense_time || '-'}</td>`;
         html += `<td><span class="badge badge-info">${thesis.room || '-'}</span></td>`;
+        html += `<td>${defenseStatusBadge(thesis)}</td>`;
         html += `<td><div class="action-buttons">`;
         
-        // أزرار حسب الصلاحيات
-        if (hasPermission('edit')) {
-            html += `<button onclick="editThesis('${thesis.id}')" class="btn btn-info btn-sm">✏️ تعديل</button>`;
+        // أزرار الحالة (للمستخدمين ذوي الصلاحية)
+        if (hasPermission('edit') && thesis.defense_status !== 'done') {
+            html += `<button onclick="markAsDone('${thesis.id}')" class="btn btn-success btn-sm" title="تسجيل كمناقَشة">✅</button>`;
+            html += `<button onclick="openPostponeModal('${thesis.id}')" class="btn btn-warning btn-sm" title="تأجيل المناقشة">⏳</button>`;
         }
-        html += `<button onclick="generatePDFForThesis('${thesis.id}')" class="btn btn-primary btn-sm">🖨️ طباعة</button>`;
+        if (hasPermission('edit')) {
+            html += `<button onclick="editThesis('${thesis.id}')" class="btn btn-info btn-sm">✏️</button>`;
+        }
+        html += `<button onclick="generatePDFForThesis('${thesis.id}')" class="btn btn-primary btn-sm">🖨️</button>`;
         if (hasPermission('delete')) {
-            html += `<button onclick="deleteThesis('${thesis.id}')" class="btn btn-danger btn-sm">🗑️ حذف</button>`;
+            html += `<button onclick="deleteThesis('${thesis.id}')" class="btn btn-danger btn-sm">🗑️</button>`;
         }
         
         html += `</div></td>`;
@@ -932,6 +938,7 @@ function displayThesesTable() {
     html += '<th>التاريخ</th>';
     html += '<th>التوقيت</th>';
     html += '<th>القاعة</th>';
+    html += '<th>الحالة</th>';
     html += '<th>إجراءات</th>';
     html += '</tr></thead><tbody>';
 
@@ -943,14 +950,19 @@ function displayThesesTable() {
         html += `<td>${thesis.supervisor}</td>`;
         html += `<td>${thesis.president}</td>`;
         html += `<td>${thesis.examiner}</td>`;
-        html += `<td><span class="badge badge-primary">${thesis.specialization}</span></td>`;
+        html += `<td><span class="badge ${specBadgeClass(thesis.specialization)}">${thesis.specialization}</span></td>`;
         html += `<td>${thesis.branch}</td>`;
         html += `<td>${thesis.defense_date || '-'}</td>`;
         html += `<td>${thesis.defense_time || '-'}</td>`;
         html += `<td><span class="badge badge-info">${thesis.room || '-'}</span></td>`;
+        html += `<td>${defenseStatusBadge(thesis)}</td>`;
         html += `<td><div class="action-buttons">`;
         
-        // أزرار حسب الصلاحيات
+        // أزرار الحالة
+        if (hasPermission('edit') && thesis.defense_status !== 'done') {
+            html += `<button onclick="markAsDone('${thesis.id}')" class="btn btn-success btn-sm" title="تسجيل كمناقَشة">✅</button>`;
+            html += `<button onclick="openPostponeModal('${thesis.id}')" class="btn btn-warning btn-sm" title="تأجيل">⏳</button>`;
+        }
         if (hasPermission('edit')) {
             html += `<button onclick="editThesis('${thesis.id}')" class="btn btn-info btn-sm">✏️</button>`;
         }
@@ -1335,6 +1347,39 @@ function handleFormSubmit(e) {
     }
 
     // جمع البيانات من النموذج
+    const statusRadio = document.querySelector('input[name="defense_status_radio"]:checked');
+    const statusVal   = statusRadio ? statusRadio.value : '';
+    const keepComm    = document.getElementById('postpone-keep-committee')?.checked !== false;
+    const prevThesis  = editingThesisId ? theses.find(t => t.id === editingThesisId) : null;
+
+    // بناء postponement_info إذا كانت الحالة مؤجلة
+    let postponementInfo = null;
+    let postponementHistory = prevThesis?.postponement_history || [];
+    if (statusVal === 'postponed') {
+        // نقل التأجيل السابق إلى التاريخ إذا تغيرت بيانات التأجيل
+        if (prevThesis?.postponement_info) {
+            postponementHistory = [...postponementHistory];
+            const oldReason = prevThesis.postponement_info.reason;
+            const newReason = document.getElementById('postpone-reason-select').value;
+            if (oldReason && oldReason !== newReason) {
+                postponementHistory.push(prevThesis.postponement_info);
+            }
+        }
+        postponementInfo = {
+            reason:             document.getElementById('postpone-reason-select').value,
+            custom_reason:      document.getElementById('postpone-custom-reason').value,
+            new_date:           document.getElementById('postpone-new-date').value,
+            new_time:           document.getElementById('postpone-new-time').value,
+            new_room:           document.getElementById('postpone-new-room').value,
+            keep_committee:     keepComm,
+            new_president:      keepComm ? '' : document.getElementById('postpone-president').value,
+            new_president_rank: keepComm ? '' : document.getElementById('postpone-president-rank').value,
+            new_examiner:       keepComm ? '' : document.getElementById('postpone-examiner').value,
+            new_examiner_rank:  keepComm ? '' : document.getElementById('postpone-examiner-rank').value,
+            postponed_at:       prevThesis?.postponement_info?.postponed_at || new Date().toISOString()
+        };
+    }
+
     const formData = {
         id: editingThesisId || generateId(),
         thesis_number: document.getElementById('thesis-number').value || generateThesisNumber(),
@@ -1352,6 +1397,9 @@ function handleFormSubmit(e) {
         defense_date: document.getElementById('defense-date').value,
         defense_time: document.getElementById('defense-time').value,
         room: document.getElementById('room').value,
+        defense_status:       statusVal,
+        postponement_info:    postponementInfo,
+        postponement_history: postponementHistory,
         created_at: editingThesisId ? 
             theses.find(t => t.id === editingThesisId)?.created_at : 
             new Date().toISOString()
@@ -1695,6 +1743,36 @@ function loadThesisForEdit(thesisId) {
     document.getElementById('defense-date').value = thesis.defense_date || '';
     document.getElementById('defense-time').value = thesis.defense_time || '';
     document.getElementById('room').value = thesis.room || '';
+
+    // استعادة حالة المناقشة
+    const statusVal = thesis.defense_status || '';
+    document.querySelectorAll('input[name="defense_status_radio"]').forEach(r => {
+        r.checked = (r.value === statusVal);
+    });
+    const postponeSec = document.getElementById('postpone-form-section');
+    if (postponeSec) postponeSec.style.display = statusVal === 'postponed' ? 'block' : 'none';
+
+    // استعادة بيانات التأجيل
+    if (statusVal === 'postponed' && thesis.postponement_info) {
+        const pi = thesis.postponement_info;
+        document.getElementById('postpone-reason-select').value = pi.reason || '';
+        const customGrp = document.getElementById('postpone-custom-reason-group');
+        if (customGrp) customGrp.style.display = pi.reason === 'أسباب أخرى' ? 'block' : 'none';
+        document.getElementById('postpone-custom-reason').value = pi.custom_reason || '';
+        document.getElementById('postpone-new-date').value = pi.new_date || '';
+        document.getElementById('postpone-new-time').value = pi.new_time || '';
+        document.getElementById('postpone-new-room').value = pi.new_room || '';
+        const keepEl   = document.getElementById('postpone-keep-committee');
+        const changeEl = document.getElementById('postpone-change-committee');
+        if (keepEl)   keepEl.checked   = pi.keep_committee !== false;
+        if (changeEl) changeEl.checked = pi.keep_committee === false;
+        const newCommSec = document.getElementById('postpone-new-committee-section');
+        if (newCommSec) newCommSec.style.display = pi.keep_committee === false ? 'block' : 'none';
+        document.getElementById('postpone-president').value      = pi.new_president || '';
+        document.getElementById('postpone-president-rank').value = pi.new_president_rank || '';
+        document.getElementById('postpone-examiner').value       = pi.new_examiner || '';
+        document.getElementById('postpone-examiner-rank').value  = pi.new_examiner_rank || '';
+    }
 }
 
 function resetForm() {
@@ -1703,6 +1781,15 @@ function resetForm() {
     document.getElementById('thesis-id').value = '';
     document.getElementById('student2-group').style.display = 'none';
     document.getElementById('add-student-btn').textContent = '➕ إضافة طالب ثانٍ';
+    // إعادة تعيين حالة المناقشة
+    const pendingRadio = document.querySelector('input[name="defense_status_radio"][value=""]');
+    if (pendingRadio) pendingRadio.checked = true;
+    const postponeSec = document.getElementById('postpone-form-section');
+    if (postponeSec) postponeSec.style.display = 'none';
+    const customGrp = document.getElementById('postpone-custom-reason-group');
+    if (customGrp) customGrp.style.display = 'none';
+    const newCommSec = document.getElementById('postpone-new-committee-section');
+    if (newCommSec) newCommSec.style.display = 'none';
     editingThesisId = null;
 }
 
@@ -4077,6 +4164,7 @@ function renderTodaySchedule() {
             <th>الرئيس</th>
             <th>المناقش</th>
             <th>التخصص</th>
+            <th>الحالة</th>
             <th>إجراءات</th>
         </tr></thead><tbody>`;
 
@@ -4084,7 +4172,10 @@ function renderTodaySchedule() {
         const students = thesis.student2
             ? `${thesis.student1} / ${thesis.student2}`
             : thesis.student1;
-        html += `<tr>
+        const isDone      = thesis.defense_status === 'done';
+        const isPostponed = thesis.defense_status === 'postponed';
+        const rowStyle    = isDone ? 'background:rgba(46,204,113,0.07);' : isPostponed ? 'background:rgba(243,156,18,0.07);' : '';
+        html += `<tr style="${rowStyle}">
             <td>${idx + 1}</td>
             <td><span class="badge badge-info">${thesis.defense_time || '-'}</span></td>
             <td><span class="badge badge-primary">${thesis.room || '-'}</span></td>
@@ -4094,9 +4185,12 @@ function renderTodaySchedule() {
             <td>${thesis.president}</td>
             <td>${thesis.examiner}</td>
             <td><span class="badge ${specBadgeClass(thesis.specialization)}">${thesis.specialization}</span></td>
+            <td>${defenseStatusBadge(thesis)}</td>
             <td>
-                <button onclick="generatePDFForThesis('${thesis.id}')" class="btn btn-primary btn-sm">🖨️ طباعة</button>
-                ${hasPermission('edit') ? `<button onclick="editThesis('${thesis.id}')" class="btn btn-info btn-sm">✏️ تعديل</button>` : ''}
+                ${hasPermission('edit') && !isDone ? `<button onclick="markAsDone('${thesis.id}')" class="btn btn-success btn-sm" title="تسجيل كمناقَشة">✅ نوقشت</button>` : ''}
+                ${hasPermission('edit') && !isDone ? `<button onclick="openPostponeModal('${thesis.id}')" class="btn btn-warning btn-sm" title="تأجيل المناقشة">⏳ تأجيل</button>` : ''}
+                <button onclick="generatePDFForThesis('${thesis.id}')" class="btn btn-primary btn-sm">🖨️</button>
+                ${hasPermission('edit') ? `<button onclick="editThesis('${thesis.id}')" class="btn btn-info btn-sm">✏️</button>` : ''}
             </td>
         </tr>`;
     });
@@ -4257,6 +4351,176 @@ window.updateSchedulePage  = updateSchedulePage;
 window.scheduleGoToday     = scheduleGoToday;
 window.scheduleChangeDay   = scheduleChangeDay;
 window.schedulePickDate    = schedulePickDate;
+
+// ================================================
+// إدارة حالة المناقشة (نوقشت / مؤجلة / لم تناقش)
+// ================================================
+
+// شارة الحالة HTML
+function defenseStatusBadge(thesis) {
+    if (thesis.defense_status === 'done')
+        return '<span class="badge badge-done">✅ نوقشت</span>';
+    if (thesis.defense_status === 'postponed') {
+        const pi = thesis.postponement_info;
+        const reason = pi ? (pi.reason === 'أسباب أخرى' ? (pi.custom_reason || 'أسباب أخرى') : pi.reason) : '';
+        const nd = pi && pi.new_date ? ` ← ${pi.new_date}` : '';
+        return `<span class="badge badge-postponed" title="${reason}${nd}">⏳ مؤجلة</span>`;
+    }
+    if (thesis.defense_date)
+        return '<span class="badge badge-pending">🔲 لم تناقش بعد</span>';
+    return '<span class="badge badge-no-date">📅 غير مجدولة</span>';
+}
+
+// تبديل ظهور قسم التأجيل في النموذج
+function onDefenseStatusChange() {
+    const val = document.querySelector('input[name="defense_status_radio"]:checked')?.value;
+    const sec = document.getElementById('postpone-form-section');
+    if (sec) sec.style.display = val === 'postponed' ? 'block' : 'none';
+}
+
+// إظهار/إخفاء حقل السبب المخصص في النموذج
+function onPostponeReasonChange() {
+    const val = document.getElementById('postpone-reason-select')?.value;
+    const grp = document.getElementById('postpone-custom-reason-group');
+    if (grp) grp.style.display = val === 'أسباب أخرى' ? 'block' : 'none';
+}
+
+// إظهار/إخفاء قسم اللجنة الجديدة في النموذج
+function onPostponeCommitteeChange() {
+    const val = document.querySelector('input[name="postpone_committee_radio"]:checked')?.value;
+    const sec = document.getElementById('postpone-new-committee-section');
+    if (sec) sec.style.display = val === 'change' ? 'block' : 'none';
+}
+
+// نفس الثلاثة للمودال
+function onPmodalReasonChange() {
+    const val = document.getElementById('pmodal-reason')?.value;
+    const grp = document.getElementById('pmodal-custom-reason-group');
+    if (grp) grp.style.display = val === 'أسباب أخرى' ? 'block' : 'none';
+}
+function onPmodalCommitteeChange() {
+    const val = document.querySelector('input[name="pmodal_committee_radio"]:checked')?.value;
+    const sec = document.getElementById('pmodal-new-committee-section');
+    if (sec) sec.style.display = val === 'change' ? 'block' : 'none';
+}
+
+// تسجيل مذكرة كمناقشة مباشرةً من الجدول
+function markAsDone(thesisId) {
+    if (!hasPermission('edit')) { showToast('ليس لديك صلاحية', 'error'); return; }
+    const thesis = theses.find(t => t.id === thesisId);
+    if (!thesis) return;
+    thesis.defense_status = 'done';
+    saveData();
+    applyFilters();
+    updateDashboard();
+    renderTodaySchedule();
+    showToast('✅ تم تسجيل المذكرة كمناقَشة بنجاح', 'success');
+}
+
+// فتح نافذة التأجيل السريع
+function openPostponeModal(thesisId) {
+    if (!hasPermission('edit')) { showToast('ليس لديك صلاحية', 'error'); return; }
+    const thesis = theses.find(t => t.id === thesisId);
+    if (!thesis) return;
+
+    document.getElementById('pmodal-thesis-id').value = thesisId;
+    document.getElementById('pmodal-thesis-title').textContent = truncateText(thesis.title, 100);
+
+    // إعادة تعيين الحقول
+    document.getElementById('pmodal-reason').value = '';
+    document.getElementById('pmodal-custom-reason').value = '';
+    document.getElementById('pmodal-custom-reason-group').style.display = 'none';
+    document.getElementById('pmodal-new-date').value = '';
+    document.getElementById('pmodal-new-time').value = '';
+    document.getElementById('pmodal-new-room').value = '';
+    document.getElementById('pmodal-keep-committee').checked = true;
+    document.getElementById('pmodal-new-committee-section').style.display = 'none';
+    document.getElementById('pmodal-president').value = '';
+    document.getElementById('pmodal-president-rank').value = '';
+    document.getElementById('pmodal-examiner').value = '';
+    document.getElementById('pmodal-examiner-rank').value = '';
+
+    document.getElementById('postpone-modal').classList.add('active');
+}
+
+// إغلاق نافذة التأجيل
+function closePostponeModal() {
+    document.getElementById('postpone-modal').classList.remove('active');
+}
+
+// حفظ التأجيل من المودال
+function savePostponeModal() {
+    const thesisId = document.getElementById('pmodal-thesis-id').value;
+    const thesis   = theses.find(t => t.id === thesisId);
+    if (!thesis) return;
+
+    const reason = document.getElementById('pmodal-reason').value;
+    if (!reason) { showToast('يرجى تحديد سبب التأجيل', 'error'); return; }
+
+    const keepCommittee = document.getElementById('pmodal-keep-committee').checked;
+    const newDate = document.getElementById('pmodal-new-date').value;
+    const newTime = document.getElementById('pmodal-new-time').value;
+    const newRoom = document.getElementById('pmodal-new-room').value;
+
+    // نقل التأجيل السابق إلى التاريخ
+    if (!thesis.postponement_history) thesis.postponement_history = [];
+    if (thesis.postponement_info) {
+        thesis.postponement_history.push(thesis.postponement_info);
+    }
+
+    thesis.defense_status = 'postponed';
+    thesis.postponement_info = {
+        reason:             reason,
+        custom_reason:      document.getElementById('pmodal-custom-reason').value,
+        new_date:           newDate,
+        new_time:           newTime,
+        new_room:           newRoom,
+        keep_committee:     keepCommittee,
+        new_president:      keepCommittee ? '' : document.getElementById('pmodal-president').value,
+        new_president_rank: keepCommittee ? '' : document.getElementById('pmodal-president-rank').value,
+        new_examiner:       keepCommittee ? '' : document.getElementById('pmodal-examiner').value,
+        new_examiner_rank:  keepCommittee ? '' : document.getElementById('pmodal-examiner-rank').value,
+        postponed_at:       new Date().toISOString()
+    };
+
+    // تحديث تاريخ المذكرة الجديد إذا حُدد
+    if (newDate) thesis.defense_date = newDate;
+    if (newTime) thesis.defense_time = newTime;
+    if (newRoom) thesis.room = newRoom;
+    if (!keepCommittee) {
+        if (thesis.postponement_info.new_president) {
+            thesis.president      = thesis.postponement_info.new_president;
+            thesis.president_rank = thesis.postponement_info.new_president_rank;
+        }
+        if (thesis.postponement_info.new_examiner) {
+            thesis.examiner      = thesis.postponement_info.new_examiner;
+            thesis.examiner_rank = thesis.postponement_info.new_examiner_rank;
+        }
+    }
+
+    saveData();
+    applyFilters();
+    updateDashboard();
+    renderTodaySchedule();
+    closePostponeModal();
+
+    const reasonText = reason === 'أسباب أخرى'
+        ? document.getElementById('pmodal-custom-reason').value || 'أسباب أخرى'
+        : reason;
+    showToast(`⏳ تم تأجيل المذكرة — السبب: ${reasonText}`, 'warning');
+}
+
+// تسجيل
+window.defenseStatusBadge       = defenseStatusBadge;
+window.onDefenseStatusChange     = onDefenseStatusChange;
+window.onPostponeReasonChange    = onPostponeReasonChange;
+window.onPostponeCommitteeChange = onPostponeCommitteeChange;
+window.onPmodalReasonChange      = onPmodalReasonChange;
+window.onPmodalCommitteeChange   = onPmodalCommitteeChange;
+window.markAsDone                = markAsDone;
+window.openPostponeModal         = openPostponeModal;
+window.closePostponeModal        = closePostponeModal;
+window.savePostponeModal         = savePostponeModal;
 
 // إرجاع كلاس الشارة حسب التخصص
 function specBadgeClass(spec) {

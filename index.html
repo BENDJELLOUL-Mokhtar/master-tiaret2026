@@ -27,11 +27,11 @@
             <form id="login-form" onsubmit="handleLogin(event)" class="login-form">
                 <div class="form-group">
                     <label for="username">اسم المستخدم</label>
-                    <input type="text" id="username" required placeholder="أدخل اسم المستخدم" value="admin">
+                    <input type="text" id="username" required placeholder="أدخل اسم المستخدم">
                 </div>
                 <div class="form-group">
                     <label for="password">كلمة المرور</label>
-                    <input type="password" id="password" required placeholder="أدخل كلمة المرور" value="admin123">
+                    <input type="password" id="password" required placeholder="أدخل كلمة المرور">
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">🔐 تسجيل الدخول</button>
             </form>
@@ -209,10 +209,6 @@
                 <a href="#" onclick="showPage('statistics')" class="nav-item" data-page="statistics">
                     <span class="icon">📈</span>
                     <span>الإحصائيات</span>
-                </a>
-                <a href="#" onclick="showPage('schedule')" class="nav-item" data-page="schedule">
-                    <span class="icon">🗓️</span>
-                    <span>برنامج المناقشات</span>
                 </a>
             </nav>
         </aside>
@@ -692,40 +688,6 @@
                 <!-- الجدول التفصيلي -->
                 <div id="statistics-table-container"></div>
             </div>
-            <!-- صفحة برنامج المناقشات -->
-            <div id="schedule" class="page">
-                <div class="page-header">
-                    <h2>🗓️ برنامج المناقشات</h2>
-                    <p class="subtitle" id="schedule-today-label"></p>
-                </div>
-
-                <!-- مؤشر التاريخ - اختيار يوم -->
-                <div class="schedule-date-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
-                    <button onclick="scheduleChangeDay(-1)" class="btn btn-secondary">◀ اليوم السابق</button>
-                    <input type="date" id="schedule-date-picker" onchange="schedulePickDate(this.value)"
-                           style="padding:8px 14px;border:1px solid var(--gray-300);border-radius:8px;font-family:Cairo,sans-serif;font-size:1rem;">
-                    <button onclick="scheduleChangeDay(1)" class="btn btn-secondary">اليوم التالي ▶</button>
-                    <button onclick="scheduleGoToday()" class="btn btn-primary">📅 اليوم</button>
-                </div>
-
-                <!-- جدول مناقشات اليوم -->
-                <div class="chart-card" style="margin-bottom:28px;">
-                    <h3 class="chart-title" id="schedule-day-title">📋 مناقشات اليوم</h3>
-                    <div id="schedule-today-table"></div>
-                </div>
-
-                <!-- مخطط الأسبوع الكامل -->
-                <div class="chart-card">
-                    <h3 class="chart-title">📊 مخطط توزيع المناقشات - الأسبوع الكامل</h3>
-                    <div id="schedule-week-label" style="text-align:center;color:var(--gray-600);font-size:0.95rem;margin-bottom:8px;"></div>
-                    <div class="chart-wrapper-lg">
-                        <canvas id="chart-weekly-schedule"></canvas>
-                    </div>
-                    <!-- جدول ملخص الأسبوع -->
-                    <div id="schedule-week-summary" style="margin-top:20px;"></div>
-                </div>
-            </div>
-
         </main>
     </div>
 
