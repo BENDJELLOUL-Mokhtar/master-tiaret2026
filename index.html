@@ -212,9 +212,14 @@
                 <div class="page-header">
                     <h2>لوحة التحكم</h2>
                     <p class="subtitle">الموسم الجامعي: 2025/2026</p>
-                    <button id="delete-all-btn" onclick="deleteAllTheses()" class="btn btn-danger delete-all-btn" style="display:none;">
-                        🗑️ حذف كل المذكرات
-                    </button>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <button id="smart-sched-btn" onclick="openSchedulingModal()" class="btn btn-success smart-sched-btn" style="display:none;">
+                            🤖 جدولة ذكية
+                        </button>
+                        <button id="delete-all-btn" onclick="deleteAllTheses()" class="btn btn-danger delete-all-btn" style="display:none;">
+                            🗑️ حذف كل المذكرات
+                        </button>
+                    </div>
                 </div>
 
                 <!-- البطاقات الإحصائية -->
@@ -686,6 +691,92 @@
         </div>
     </div>
     </div> <!-- نهاية المنصة الرئيسية -->
+
+    <!-- نافذة الجدولة الذكية -->
+    <div id="scheduling-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:2000; overflow-y:auto; padding:20px;">
+        <div class="sched-modal-box">
+            <!-- رأس النافذة -->
+            <div class="sched-modal-header">
+                <div>
+                    <h2>🤖 نظام الجدولة الذكية التلقائية</h2>
+                    <p>توزيع التواريخ والتوقيت والقاعات دون تضارب مع مراعاة قيود الأساتذة</p>
+                </div>
+                <button onclick="closeSchedulingModal()" class="sched-close-btn">✕</button>
+            </div>
+
+            <!-- مؤشر الخطوات -->
+            <div class="sched-steps-bar">
+                <div class="sched-step-item active" id="sind-1">
+                    <span class="sched-step-num">1</span>
+                    <span class="sched-step-label">إعدادات الفترة</span>
+                </div>
+                <div class="sched-step-line"></div>
+                <div class="sched-step-item" id="sind-2">
+                    <span class="sched-step-num">2</span>
+                    <span class="sched-step-label">قيود الأساتذة</span>
+                </div>
+                <div class="sched-step-line"></div>
+                <div class="sched-step-item" id="sind-3">
+                    <span class="sched-step-num">3</span>
+                    <span class="sched-step-label">مراجعة وتطبيق</span>
+                </div>
+            </div>
+
+            <!-- محتوى الخطوات -->
+            <div class="sched-modal-body">
+
+                <!-- الخطوة 1: إعدادات الفترة -->
+                <div id="sched-step-1" class="sched-content active">
+                    <div class="sched-info-box" id="sched-summary"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>📅 تاريخ بداية جلسات المناقشة</label>
+                            <input type="date" id="sched-start-date" onchange="updateSchedSummary()">
+                        </div>
+                        <div class="form-group">
+                            <label>📅 تاريخ نهاية جلسات المناقشة</label>
+                            <input type="date" id="sched-end-date" onchange="updateSchedSummary()">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>تحديد أيام الراحة (تُستثنى من الجدول)</label>
+                        <div class="weekday-checks">
+                            <label class="weekday-check-item"><input type="checkbox" name="exclude-day" value="6"> الجمعة</label>
+                            <label class="weekday-check-item"><input type="checkbox" name="exclude-day" value="0"> السبت</label>
+                            <label class="weekday-check-item"><input type="checkbox" name="exclude-day" value="1"> الأحد</label>
+                            <label class="weekday-check-item"><input type="checkbox" name="exclude-day" value="2"> الإثنين</label>
+                            <label class="weekday-check-item"><input type="checkbox" name="exclude-day" value="3"> الثلاثاء</label>
+                            <label class="weekday-check-item"><input type="checkbox" name="exclude-day" value="4"> الأربعاء</label>
+                            <label class="weekday-check-item"><input type="checkbox" name="exclude-day" value="5"> الخميس</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>الحد الأقصى لمشاركة الأستاذ في لجان مختلفة باليوم الواحد</label>
+                        <input type="number" id="sched-max-per-day" value="3" min="1" max="10" style="width:100px; padding:8px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                </div>
+
+                <!-- الخطوة 2: قيود الأساتذة -->
+                <div id="sched-step-2" class="sched-content">
+                    <p class="sched-hint">حدد اشتراطات خاصة لكل أستاذ يشارك في لجان المناقشة غير المجدولة. يمكن مثلاً اشتراط تجميع جلساته في أيام متتالية.</p>
+                    <div id="prof-constraints-list"></div>
+                </div>
+
+                <!-- الخطوة 3: مراجعة وتطبيق -->
+                <div id="sched-step-3" class="sched-content">
+                    <div id="scheduling-preview"></div>
+                </div>
+
+            </div><!-- sched-modal-body -->
+
+            <!-- أزرار التنقل -->
+            <div class="sched-modal-footer">
+                <button onclick="schedPrev()" id="btn-sched-prev" class="btn btn-secondary" style="display:none">← السابق</button>
+                <button onclick="schedNext()" id="btn-sched-next" class="btn btn-primary">التالي →</button>
+                <button onclick="applySchedulingResults()" id="btn-apply-sched" class="btn btn-success" style="display:none">✅ تطبيق الجدول</button>
+            </div>
+        </div>
+    </div>
 
     <!-- ملف البيانات والمنطق -->
     <script src="app.js"></script>

@@ -252,6 +252,12 @@ function updateUIForUser(user) {
         deleteAllBtn.style.display = hasPermission('delete') ? 'inline-flex' : 'none';
     }
 
+    // إظهار/إخفاء زر الجدولة الذكية
+    const schedBtn = document.getElementById('smart-sched-btn');
+    if (schedBtn) {
+        schedBtn.style.display = hasPermission('edit') ? 'inline-flex' : 'none';
+    }
+
     // إخفاء أزرار الاستيراد والتصدير حسب الصلاحيات
     const importBtn = document.querySelector('button[onclick="importExcel()"]');
     const exportBtn = document.querySelector('button[onclick="exportToExcel()"]');
@@ -3055,6 +3061,401 @@ window.exportToExcel = exportToExcel;
 window.exportStatistics = exportStatistics;
 window.generatePDFForThesis = generatePDFForThesis;
 window.deleteAllTheses = deleteAllTheses;
+
+// ================================================
+// نظام الجدولة الذكية التلقائية
+// ================================================
+
+const SCHEDULE_TIMES = [
+    '09 سا و00 د',
+    '10 سا و15 د',
+    '11 سا و30د',
+    '13 سا و15 د',
+    '14 سا و30 د'
+];
+
+const SCHEDULE_ROOMS = [
+    'مدرج الوئام', 'مدرج المعرفة', 'مدرج المستقبل',
+    'مدرج السلام', 'مدرج الأمل',
+    'القاعة 01', 'القاعة 02', 'القاعة 03',
+    'القاعة 20', 'القاعة 21', 'القاعة 22', 'القاعة 23'
+];
+
+const PROF_CONSTRAINTS_KEY = 'smart_prof_constraints';
+let schedulingResults = null;
+let currentSchedStep = 1;
+
+function getAvailableRooms() {
+    const roomSelect = document.getElementById('room');
+    if (roomSelect) {
+        const opts = Array.from(roomSelect.options).map(o => o.value).filter(v => v && v.trim());
+        if (opts.length > 0) return opts;
+    }
+    return SCHEDULE_ROOMS;
+}
+
+function getProfConstraints() {
+    try { return JSON.parse(localStorage.getItem(PROF_CONSTRAINTS_KEY) || '{}'); }
+    catch { return {}; }
+}
+
+function saveProfConstraints(c) {
+    localStorage.setItem(PROF_CONSTRAINTS_KEY, JSON.stringify(c));
+}
+
+function openSchedulingModal() {
+    if (!hasPermission('edit')) {
+        showToast('ليس لديك صلاحية الجدولة', 'error');
+        return;
+    }
+    if (theses.length === 0) {
+        showToast('لا توجد مذكرات لجدولتها', 'warning');
+        return;
+    }
+    currentSchedStep = 1;
+    updateSchedSummary();
+    showSchedStep(1);
+    document.getElementById('scheduling-modal').style.display = 'block';
+}
+
+function closeSchedulingModal() {
+    document.getElementById('scheduling-modal').style.display = 'none';
+    schedulingResults = null;
+}
+
+function showSchedStep(step) {
+    currentSchedStep = step;
+    [1, 2, 3].forEach(s => {
+        const content = document.getElementById(`sched-step-${s}`);
+        const ind = document.getElementById(`sind-${s}`);
+        if (content) content.classList.toggle('active', s === step);
+        if (ind) {
+            ind.classList.toggle('active', s === step);
+            ind.classList.toggle('done', s < step);
+        }
+    });
+    const prev = document.getElementById('btn-sched-prev');
+    const next = document.getElementById('btn-sched-next');
+    const apply = document.getElementById('btn-apply-sched');
+    if (prev)  prev.style.display  = step > 1 ? 'inline-flex' : 'none';
+    if (next)  next.style.display  = step < 3 ? 'inline-flex' : 'none';
+    if (apply) apply.style.display = step === 3 ? 'inline-flex' : 'none';
+    if (step === 2) buildProfConstraintsUI();
+    if (step === 3) runAndPreviewScheduling();
+}
+
+function schedNext() {
+    if (currentSchedStep === 1) {
+        const start = document.getElementById('sched-start-date').value;
+        const end   = document.getElementById('sched-end-date').value;
+        if (!start || !end) { showToast('الرجاء تحديد تاريخ البداية والنهاية', 'error'); return; }
+        if (new Date(end) < new Date(start)) { showToast('تاريخ النهاية يجب أن يكون بعد البداية', 'error'); return; }
+    }
+    if (currentSchedStep === 2) saveConstraintsFromUI();
+    showSchedStep(currentSchedStep + 1);
+}
+
+function schedPrev() { showSchedStep(currentSchedStep - 1); }
+
+function updateSchedSummary() {
+    const unscheduled = theses.filter(t => !t.defense_date || !t.defense_time || !t.room);
+    const scheduled   = theses.filter(t =>  t.defense_date &&  t.defense_time &&  t.room);
+    const el = document.getElementById('sched-summary');
+    if (!el) return;
+    el.innerHTML = `
+        <div class="sched-stat"><span class="sched-stat-num">${theses.length}</span><span>إجمالي المذكرات</span></div>
+        <div class="sched-stat scheduled"><span class="sched-stat-num">${scheduled.length}</span><span>✅ مجدولة</span></div>
+        <div class="sched-stat pending"><span class="sched-stat-num">${unscheduled.length}</span><span>⏳ تحتاج جدولة</span></div>
+    `;
+}
+
+function buildProfConstraintsUI() {
+    const profSet = new Set();
+    theses.filter(t => !t.defense_date || !t.defense_time || !t.room).forEach(t => {
+        if (t.supervisor) profSet.add(t.supervisor);
+        if (t.president)  profSet.add(t.president);
+        if (t.examiner)   profSet.add(t.examiner);
+    });
+    const profs = Array.from(profSet).sort((a, b) => a.localeCompare(b, 'ar'));
+    const saved = getProfConstraints();
+    const container = document.getElementById('prof-constraints-list');
+    if (!container) return;
+    if (profs.length === 0) {
+        container.innerHTML = '<p class="sched-hint">لا توجد مذكرات غير مجدولة</p>';
+        return;
+    }
+    container.innerHTML = profs.map(prof => {
+        const c = saved[prof] || {};
+        const count = theses.filter(t => t.supervisor === prof || t.president === prof || t.examiner === prof).length;
+        const safeProf = prof.replace(/"/g, '&quot;');
+        return `
+        <div class="prof-constraint-card" data-prof="${safeProf}">
+            <div class="prof-constraint-header">
+                <span class="prof-constraint-name">👨‍🏫 ${prof}</span>
+                <span class="prof-thesis-count">${count} مذكرة</span>
+            </div>
+            <div class="prof-constraint-body">
+                <label class="constraint-check">
+                    <input type="checkbox" class="c-consecutive" ${c.consecutiveDays ? 'checked' : ''}>
+                    <span>🔗 يشترط أيام متتالية — تجميع جلساته في أيام متقاربة قدر الإمكان</span>
+                </label>
+                <div class="constraint-row">
+                    <label>⏰ الوقت المفضل:</label>
+                    <select class="c-time-pref">
+                        <option value="any"       ${!c.preferredTime || c.preferredTime==='any'       ? 'selected':''}>أي وقت</option>
+                        <option value="morning"   ${c.preferredTime==='morning'   ? 'selected':''}>صباحي (قبل 12ظ)</option>
+                        <option value="afternoon" ${c.preferredTime==='afternoon' ? 'selected':''}>مسائي (بعد 12ظ)</option>
+                    </select>
+                </div>
+                <div class="constraint-row">
+                    <label>📊 الحد الأقصى في اليوم:</label>
+                    <input type="number" class="c-max-day" value="${c.maxPerDay || 3}" min="1" max="10">
+                </div>
+                <div class="constraint-row">
+                    <label>🚫 تواريخ غير متاح:</label>
+                    <input type="text" class="c-unavail" placeholder="2026-06-10, 2026-06-11, ..."
+                           value="${(c.unavailableDates || []).join(', ')}">
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function saveConstraintsFromUI() {
+    const cards = document.querySelectorAll('.prof-constraint-card');
+    const constraints = {};
+    cards.forEach(card => {
+        const prof = card.dataset.prof;
+        const unavailStr = card.querySelector('.c-unavail').value;
+        constraints[prof] = {
+            consecutiveDays: card.querySelector('.c-consecutive').checked,
+            preferredTime:   card.querySelector('.c-time-pref').value,
+            maxPerDay:       parseInt(card.querySelector('.c-max-day').value) || 3,
+            unavailableDates: unavailStr ? unavailStr.split(',').map(d => d.trim()).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) : []
+        };
+    });
+    saveProfConstraints(constraints);
+}
+
+function runAndPreviewScheduling() {
+    const startDate    = document.getElementById('sched-start-date').value;
+    const endDate      = document.getElementById('sched-end-date').value;
+    const excludeDays  = Array.from(document.querySelectorAll('input[name="exclude-day"]:checked')).map(cb => parseInt(cb.value));
+    const maxProfPerDay = parseInt(document.getElementById('sched-max-per-day').value) || 3;
+    const constraints  = getProfConstraints();
+    const preview = document.getElementById('scheduling-preview');
+    preview.innerHTML = '<div style="text-align:center;padding:40px;font-size:1.1rem;">⏳ جاري التحليل الذكي...</div>';
+    setTimeout(() => {
+        schedulingResults = runSmartScheduling(startDate, endDate, excludeDays, maxProfPerDay, constraints);
+        renderSchedulingPreview(schedulingResults);
+    }, 400);
+}
+
+function renderSchedulingPreview(result) {
+    const preview = document.getElementById('scheduling-preview');
+    const applyBtn = document.getElementById('btn-apply-sched');
+    if (result.error) {
+        preview.innerHTML = `<div class="sched-error">❌ ${result.error}</div>`;
+        if (applyBtn) applyBtn.style.display = 'none';
+        return;
+    }
+    const { results, failed } = result;
+    let html = '';
+    if (results.length > 0) {
+        html += `<div class="sched-success-banner">✅ تم توزيع <strong>${results.length}</strong> مذكرة بنجاح وفق القيود المحددة</div>`;
+        html += `<div class="sched-preview-table-wrap"><table class="sched-preview-table">
+            <thead><tr>
+                <th>رقم المذكرة</th><th>الطالب</th><th>المشرف</th><th>الرئيس</th><th>التاريخ المقترح</th><th>التوقيت</th><th>القاعة</th>
+            </tr></thead><tbody>`;
+        results.forEach(r => {
+            html += `<tr>
+                <td>${r.thesis.thesis_number}</td>
+                <td>${r.thesis.student1}</td>
+                <td>${r.thesis.supervisor}</td>
+                <td>${r.thesis.president || '-'}</td>
+                <td><strong>${formatDateAr(r.date)}</strong></td>
+                <td><span class="badge badge-primary">${r.time}</span></td>
+                <td><span class="badge badge-info">${r.room}</span></td>
+            </tr>`;
+        });
+        html += '</tbody></table></div>';
+    }
+    if (failed.length > 0) {
+        html += `<div class="sched-failed-banner">⚠️ لم يتمكن النظام من جدولة <strong>${failed.length}</strong> مذكرة — قد تحتاج مراجعة قيود الأساتذة أو توسيع نطاق التواريخ</div>`;
+        html += '<ul class="sched-failed-list">';
+        failed.forEach(t => { html += `<li>📄 ${t.thesis_number} — ${t.student1} (مشرف: ${t.supervisor})</li>`; });
+        html += '</ul>';
+    }
+    if (results.length === 0 && applyBtn) applyBtn.style.display = 'none';
+    preview.innerHTML = html;
+}
+
+function formatDateAr(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('ar-DZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    } catch { return dateStr; }
+}
+
+function applySchedulingResults() {
+    if (!schedulingResults || !schedulingResults.results || schedulingResults.results.length === 0) return;
+    if (!confirm(`هل تريد تطبيق الجدول المقترح على ${schedulingResults.results.length} مذكرة؟\nسيتم حفظ التواريخ والتوقيتات والقاعات فوراً.`)) return;
+    schedulingResults.results.forEach(r => {
+        const thesis = theses.find(t => t.id === r.thesis.id);
+        if (thesis) {
+            thesis.defense_date = r.date;
+            thesis.defense_time = r.time;
+            thesis.room = r.room;
+        }
+    });
+    saveData();
+    closeSchedulingModal();
+    applyFilters();
+    updateDashboard();
+    showToast(`✅ تم تطبيق الجدول على ${schedulingResults.results.length} مذكرة بنجاح`, 'success');
+}
+
+// ---- الخوارزمية الأساسية ----
+
+function generateDateRange(startDate, endDate, excludeWeekdays) {
+    const dates = [];
+    const current = new Date(startDate + 'T00:00:00');
+    const end     = new Date(endDate   + 'T00:00:00');
+    while (current <= end) {
+        if (!excludeWeekdays.includes(current.getDay())) {
+            dates.push(current.toISOString().split('T')[0]);
+        }
+        current.setDate(current.getDate() + 1);
+    }
+    return dates;
+}
+
+function buildOccupationMaps(scheduledTheses) {
+    const roomOcc = {}, profOcc = {}, profDays = {};
+    scheduledTheses.forEach(t => {
+        const { defense_date: d, defense_time: ti, room: r } = t;
+        if (!d || !ti || !r) return;
+        if (!roomOcc[d]) roomOcc[d] = {};
+        if (!roomOcc[d][ti]) roomOcc[d][ti] = {};
+        roomOcc[d][ti][r] = true;
+        if (!profOcc[d]) profOcc[d] = {};
+        if (!profOcc[d][ti]) profOcc[d][ti] = new Set();
+        [t.supervisor, t.president, t.examiner].filter(Boolean).forEach(p => {
+            profOcc[d][ti].add(p);
+            if (!profDays[p]) profDays[p] = new Set();
+            profDays[p].add(d);
+        });
+    });
+    return { roomOcc, profOcc, profDays };
+}
+
+function daysDiffSched(d1, d2) {
+    return Math.abs((new Date(d2 + 'T00:00:00') - new Date(d1 + 'T00:00:00')) / 86400000);
+}
+
+function findBestSlot(thesis, availableDates, rooms, constraints, roomOcc, profOcc, profDays, maxProfPerDay) {
+    const professors = [thesis.supervisor, thesis.president, thesis.examiner].filter(Boolean);
+
+    // نُحسب درجة جاذبية كل تاريخ
+    const scoredDates = availableDates.map(date => {
+        let score = 0;
+        for (const prof of professors) {
+            const c = constraints[prof] || {};
+            // تاريخ محظور → عقوبة كبيرة
+            if (c.unavailableDates && c.unavailableDates.includes(date)) return { date, score: -99999 };
+            // مكافأة الأيام المتتالية
+            if (c.consecutiveDays && profDays[prof] && profDays[prof].size > 0) {
+                const sorted = Array.from(profDays[prof]).sort();
+                const lastDate = sorted[sorted.length - 1];
+                const diff = daysDiffSched(lastDate, date);
+                if (diff === 0)      score += 8;   // نفس اليوم
+                else if (diff === 1) score += 15;  // يوم متتالي ← الأمثل
+                else if (diff === 2) score += 4;
+                else score -= Math.min(diff, 10);
+            }
+        }
+        return { date, score };
+    }).sort((a, b) => b.score - a.score);
+
+    for (const { date, score } of scoredDates) {
+        if (score <= -99999) continue;
+
+        // التحقق من الحد الأقصى لمشاركة الأستاذ في اليوم
+        const overloaded = professors.some(prof => {
+            const c = constraints[prof] || {};
+            const max = c.maxPerDay || maxProfPerDay;
+            let count = 0;
+            SCHEDULE_TIMES.forEach(t => { if (profOcc[date]?.[t]?.has(prof)) count++; });
+            return count >= max;
+        });
+        if (overloaded) continue;
+
+        // تحديد ترتيب الأوقات حسب التفضيل
+        let timesToTry = [...SCHEDULE_TIMES];
+        const morningCount   = professors.filter(p => constraints[p]?.preferredTime === 'morning').length;
+        const afternoonCount = professors.filter(p => constraints[p]?.preferredTime === 'afternoon').length;
+        if (afternoonCount > morningCount) timesToTry = [...SCHEDULE_TIMES].reverse();
+
+        for (const time of timesToTry) {
+            if (professors.some(prof => profOcc[date]?.[time]?.has(prof))) continue;
+            for (const room of rooms) {
+                if (!roomOcc[date]?.[time]?.[room]) return { date, time, room };
+            }
+        }
+    }
+    return null;
+}
+
+function runSmartScheduling(startDate, endDate, excludeDays, maxProfPerDay, constraints) {
+    const rooms          = getAvailableRooms();
+    const availableDates = generateDateRange(startDate, endDate, excludeDays);
+    if (availableDates.length === 0) return { error: 'لا توجد تواريخ متاحة في النطاق المحدد' };
+    const unscheduled = theses.filter(t => !t.defense_date || !t.defense_time || !t.room);
+    if (unscheduled.length === 0) return { error: 'جميع المذكرات مجدولة بالفعل' };
+    const scheduled = theses.filter(t => t.defense_date && t.defense_time && t.room);
+    const { roomOcc, profOcc, profDays } = buildOccupationMaps(scheduled);
+
+    // ترتيب المذكرات: الأكثر تقييداً أولاً
+    const sorted = [...unscheduled].sort((a, b) => {
+        const score = thesis => [thesis.supervisor, thesis.president, thesis.examiner]
+            .filter(Boolean).reduce((s, p) => {
+                const c = constraints[p] || {};
+                return s + (c.consecutiveDays ? 10 : 0) + (c.unavailableDates?.length || 0) * 2;
+            }, 0);
+        return score(b) - score(a);
+    });
+
+    const results = [], failed = [];
+    for (const thesis of sorted) {
+        const slot = findBestSlot(thesis, availableDates, rooms, constraints, roomOcc, profOcc, profDays, maxProfPerDay);
+        if (slot) {
+            results.push({ thesis, ...slot });
+            const { date, time, room } = slot;
+            if (!roomOcc[date]) roomOcc[date] = {};
+            if (!roomOcc[date][time]) roomOcc[date][time] = {};
+            roomOcc[date][time][room] = true;
+            if (!profOcc[date]) profOcc[date] = {};
+            if (!profOcc[date][time]) profOcc[date][time] = new Set();
+            [thesis.supervisor, thesis.president, thesis.examiner].filter(Boolean).forEach(p => {
+                profOcc[date][time].add(p);
+                if (!profDays[p]) profDays[p] = new Set();
+                profDays[p].add(date);
+            });
+        } else {
+            failed.push(thesis);
+        }
+    }
+    return { results, failed };
+}
+
+window.openSchedulingModal  = openSchedulingModal;
+window.closeSchedulingModal = closeSchedulingModal;
+window.schedNext            = schedNext;
+window.schedPrev            = schedPrev;
+window.updateSchedSummary   = updateSchedSummary;
+window.applySchedulingResults = applySchedulingResults;
+
 window.toggleFilterPanel = toggleFilterPanel;
 window.onFilterChange = onFilterChange;
 window.selectAllFilter = selectAllFilter;

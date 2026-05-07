@@ -542,9 +542,340 @@ body {
     100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
 }
 
-.delete-all-btn:hover {
-    background: #b71c1c !important;
-    transform: scale(1.05);
+.delete-all-btn:hover { background: #b71c1c !important; transform: scale(1.05); }
+
+.smart-sched-btn {
+    background: linear-gradient(135deg, #1B5E20, #2E7D32) !important;
+    border: 2px solid #0D3D12 !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    padding: 10px 22px !important;
+    border-radius: 8px !important;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    animation: pulse-green 2.5s infinite;
+}
+
+@keyframes pulse-green {
+    0%   { box-shadow: 0 0 0 0 rgba(27, 94, 32, 0.6); }
+    70%  { box-shadow: 0 0 0 12px rgba(27, 94, 32, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(27, 94, 32, 0); }
+}
+
+.smart-sched-btn:hover { transform: scale(1.05); filter: brightness(1.1); }
+
+/* ================================================
+   نافذة الجدولة الذكية
+================================================ */
+.sched-modal-box {
+    background: white;
+    border-radius: 16px;
+    max-width: 820px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    max-height: 92vh;
+    overflow: hidden;
+}
+
+.sched-modal-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    padding: 20px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.sched-modal-header h2 { font-size: 1.4rem; margin: 0 0 4px 0; }
+.sched-modal-header p  { font-size: 0.85rem; opacity: 0.85; margin: 0; }
+
+.sched-close-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.2s;
+}
+.sched-close-btn:hover { background: rgba(255,255,255,0.35); }
+
+/* مؤشر الخطوات */
+.sched-steps-bar {
+    display: flex;
+    align-items: center;
+    padding: 16px 30px;
+    background: var(--gray-100);
+    border-bottom: 1px solid var(--gray-200);
+    flex-shrink: 0;
+}
+
+.sched-step-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.45;
+    transition: opacity 0.3s;
+}
+
+.sched-step-item.active, .sched-step-item.done { opacity: 1; }
+
+.sched-step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--gray-400);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: background 0.3s;
+}
+
+.sched-step-item.active .sched-step-num { background: var(--primary-color); }
+.sched-step-item.done .sched-step-num   { background: var(--success-color); }
+
+.sched-step-label { font-size: 0.88rem; font-weight: 600; color: var(--gray-800); white-space: nowrap; }
+
+.sched-step-line {
+    flex: 1;
+    height: 2px;
+    background: var(--gray-300);
+    margin: 0 12px;
+}
+
+/* محتوى الخطوات */
+.sched-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 25px;
+}
+
+.sched-content { display: none; }
+.sched-content.active { display: block; }
+
+/* صندوق الإحصاء */
+.sched-info-box {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    background: linear-gradient(135deg, #E8F5E9, #C8E6C9);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    border-right: 4px solid var(--primary-color);
+}
+
+.sched-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 20px;
+    background: white;
+    border-radius: 8px;
+    flex: 1;
+    min-width: 90px;
+    font-size: 0.85rem;
+    color: var(--gray-600);
+}
+
+.sched-stat-num { font-size: 1.8rem; font-weight: 700; color: var(--primary-dark); }
+.sched-stat.pending .sched-stat-num { color: var(--warning-color); }
+.sched-stat.scheduled .sched-stat-num { color: var(--success-color); }
+
+/* أيام الأسبوع */
+.weekday-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.weekday-check-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: 2px solid var(--gray-300);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.weekday-check-item:has(input:checked) {
+    border-color: var(--danger-color);
+    background: #ffebee;
+    color: var(--danger-color);
+}
+
+.weekday-check-item input { display: none; }
+
+/* بطاقات قيود الأساتذة */
+.prof-constraint-card {
+    border: 2px solid var(--gray-200);
+    border-radius: 12px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.prof-constraint-card:has(.c-consecutive:checked) {
+    border-color: var(--primary-color);
+}
+
+.prof-constraint-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--gray-100);
+    cursor: pointer;
+}
+
+.prof-constraint-name { font-weight: 700; font-size: 0.95rem; color: var(--primary-dark); }
+.prof-thesis-count {
+    font-size: 0.8rem;
+    background: var(--primary-color);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 10px;
+}
+
+.prof-constraint-body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.constraint-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 10px 12px;
+    background: #f1f8e9;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.constraint-check:has(input:checked) {
+    border-color: var(--primary-color);
+    background: #e8f5e9;
+}
+
+.constraint-check input { width: 18px; height: 18px; accent-color: var(--primary-color); }
+
+.constraint-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.88rem;
+}
+
+.constraint-row label { min-width: 160px; color: var(--gray-700); font-weight: 600; }
+.constraint-row select, .constraint-row input {
+    flex: 1;
+    padding: 7px 10px;
+    border: 2px solid var(--gray-300);
+    border-radius: 8px;
+    font-family: 'Cairo', sans-serif;
+    font-size: 0.88rem;
+    transition: border-color 0.2s;
+}
+.constraint-row select:focus, .constraint-row input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* نتائج الجدولة */
+.sched-success-banner {
+    background: linear-gradient(135deg, #E8F5E9, #A5D6A7);
+    border-right: 5px solid var(--success-color);
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-weight: 700;
+    color: #1B5E20;
+    margin-bottom: 16px;
+    font-size: 1rem;
+}
+
+.sched-failed-banner {
+    background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+    border-right: 5px solid var(--warning-color);
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    color: #E65100;
+    margin: 16px 0 8px;
+}
+
+.sched-failed-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px 0;
+}
+.sched-failed-list li {
+    padding: 6px 14px;
+    font-size: 0.88rem;
+    color: var(--gray-700);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.sched-error {
+    text-align: center;
+    padding: 30px;
+    color: var(--danger-color);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.sched-preview-table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: var(--shadow-sm); }
+.sched-preview-table { width: 100%; border-collapse: collapse; min-width: 600px; }
+.sched-preview-table thead { background: var(--primary-color); color: white; }
+.sched-preview-table th { padding: 10px 12px; font-size: 0.88rem; text-align: right; white-space: nowrap; }
+.sched-preview-table td { padding: 8px 12px; font-size: 0.85rem; border-bottom: 1px solid var(--gray-200); }
+.sched-preview-table tbody tr:hover { background: var(--gray-100); }
+.sched-preview-table tbody tr:nth-child(even) { background: #f9f9f9; }
+
+.sched-modal-footer {
+    padding: 14px 25px;
+    border-top: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-shrink: 0;
+    background: var(--gray-100);
+}
+
+.sched-hint {
+    color: var(--gray-600);
+    font-size: 0.9rem;
+    background: #E3F2FD;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border-right: 4px solid #2196F3;
+    margin-bottom: 16px;
 }
 
 .page-header h2 {
@@ -552,6 +883,7 @@ body {
     color: var(--primary-dark);
     font-weight: 700;
 }
+
 
 .subtitle {
     font-size: 0.9rem;
