@@ -392,10 +392,14 @@ function updateUIForUser(user) {
         schedBtn.style.display = hasPermission('edit') ? 'inline-flex' : 'none';
     }
 
-    // زر استيراد Excel في لوحة التحكم
+    // أزرار Excel في لوحة التحكم (نموذج + استيراد)
     const dashImportBtn = document.getElementById('import-excel-btn');
     if (dashImportBtn) {
         dashImportBtn.style.display = hasPermission('import') ? 'inline-flex' : 'none';
+    }
+    const dlTemplateBtn = document.getElementById('download-template-btn');
+    if (dlTemplateBtn) {
+        dlTemplateBtn.style.display = hasPermission('import') ? 'inline-flex' : 'none';
     }
 
     // إخفاء أزرار الاستيراد والتصدير حسب الصلاحيات
