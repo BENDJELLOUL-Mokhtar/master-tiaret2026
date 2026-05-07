@@ -2793,7 +2793,7 @@ tbody td {
 .tasbih-fab {
     position: fixed;
     bottom: 32px;
-    left: 32px;
+    right: 32px;
     width: 62px;
     height: 62px;
     border-radius: 50%;
