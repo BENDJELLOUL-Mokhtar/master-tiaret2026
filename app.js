@@ -4353,10 +4353,46 @@ function renderSchedulingPreview(result) {
         html += '</tbody></table></div>';
     }
     if (failed.length > 0) {
-        html += `<div class="sched-failed-banner">⚠️ لم يتمكن النظام من جدولة <strong>${failed.length}</strong> مذكرة — قد تحتاج مراجعة قيود الأساتذة أو توسيع نطاق التواريخ</div>`;
-        html += '<ul class="sched-failed-list">';
-        failed.forEach(t => { html += `<li>📄 ${t.thesis_number} — ${t.student1} (مشرف: ${t.supervisor})</li>`; });
-        html += '</ul>';
+        html += `<div class="sched-failed-banner">⚠️ لم يتمكن النظام من جدولة <strong>${failed.length}</strong> مذكرة</div>`;
+        html += '<div class="sched-failed-details">';
+        failed.forEach((failedItem, index) => {
+            const t = failedItem.thesis;
+            html += `<div class="failed-thesis-card">
+                <div class="failed-thesis-header">
+                    <span class="failed-thesis-number">📄 ${t.thesis_number}</span>
+                    <span class="failed-thesis-student">${t.student1}</span>
+                </div>
+                <div class="failed-thesis-info">
+                    <span>👨‍🏫 المشرف: <strong>${t.supervisor}</strong></span>
+                    ${t.president ? `<span>👔 الرئيس: <strong>${t.president}</strong></span>` : ''}
+                    ${t.examiner ? `<span>👓 المناقش: <strong>${t.examiner}</strong></span>` : ''}
+                </div>
+                <div class="failed-reasons">
+                    <div class="reasons-title">🔍 أسباب عدم الجدولة:</div>
+                    <ul class="reasons-list">
+                        ${failedItem.reasons.map(r => `<li>${r}</li>`).join('')}
+                    </ul>
+                </div>
+                ${failedItem.suggestions && failedItem.suggestions.length > 0 ? `
+                <div class="failed-suggestions">
+                    <div class="suggestions-title">💡 حلول مقترحة:</div>
+                    <div class="suggestions-list">
+                        ${failedItem.suggestions.map(s => `
+                            <div class="suggestion-card">
+                                <div class="suggestion-icon">${s.icon}</div>
+                                <div class="suggestion-content">
+                                    <div class="suggestion-title">${s.title}</div>
+                                    <div class="suggestion-desc">${s.description}</div>
+                                    <div class="suggestion-action">✅ ${s.action}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            </div>`;
+        });
+        html += '</div>';
     }
     if (results.length === 0 && applyBtn) applyBtn.style.display = 'none';
     preview.innerHTML = html;
@@ -4522,6 +4558,7 @@ function findBestSlot(thesis, availableDates, rooms, constraints, roomOcc, profO
 // دالة محسّنة مع الشروط العامة
 function findBestSlotWithGeneralConstraints(thesis, availableDates, rooms, profConstraints, generalConstraints, roomOcc, profOcc, profDays, dateCount) {
     const professors = [thesis.supervisor, thesis.president, thesis.examiner].filter(Boolean);
+    const failureReasons = []; // تتبع أسباب الفشل
     
     // قيود اليومين المتتابعين لكل أستاذ
     const twoDay = {};
@@ -4555,7 +4592,10 @@ function findBestSlotWithGeneralConstraints(thesis, availableDates, rooms, profC
                 const dayName = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][d.getDay()];
                 return allowedDays.some(allowed => allowed.includes(dayName));
             });
-            if (filteredDates.length === 0) filteredDates = [...availableDates]; // عدم حظر كامل
+            if (filteredDates.length === 0) {
+                failureReasons.push('لا توجد تواريخ متاحة لشعبة ' + thesis.branch + ' حسب تخصيص الأيام');
+                filteredDates = [...availableDates]; // عدم حظر كامل
+            }
         }
     }
 
@@ -4566,6 +4606,7 @@ function findBestSlotWithGeneralConstraints(thesis, availableDates, rooms, profC
         
         // الشرط العام: الحد الأقصى للمذكرات في اليوم
         if (currentCount >= generalConstraints.maxThesesPerDay) {
+            failureReasons.push(`التاريخ ${date}: تم الوصول للحد الأقصى (${generalConstraints.maxThesesPerDay} مذكرة/يوم)`);
             return { date, score: -99999 };
         }
         
@@ -4582,6 +4623,7 @@ function findBestSlotWithGeneralConstraints(thesis, availableDates, rooms, profC
 
             // تاريخ محظور
             if (c.unavailableDates && c.unavailableDates.includes(date)) {
+                failureReasons.push(`الأستاذ ${prof}: تاريخ ${date} محظور`);
                 return { date, score: -99999 };
             }
 
@@ -4589,7 +4631,10 @@ function findBestSlotWithGeneralConstraints(thesis, availableDates, rooms, profC
             if (c.twoDaysOnly) {
                 const allowed = twoDay[prof];
                 if (allowed) {
-                    if (!allowed.includes(date)) return { date, score: -99999 };
+                    if (!allowed.includes(date)) {
+                        failureReasons.push(`الأستاذ ${prof}: يشترط يومين متتابعين فقط (${allowed.join(', ')})`);
+                        return { date, score: -99999 };
+                    }
                     score += 20;
                 } else {
                     score += 5;
@@ -4612,28 +4657,36 @@ function findBestSlotWithGeneralConstraints(thesis, availableDates, rooms, profC
     }).sort((a, b) => b.score - a.score);
 
     // البحث عن أفضل وقت وقاعة
+    let triedDates = 0;
+    let profOverloadCount = 0;
+    let profConflictCount = 0;
+    let concurrentLimitCount = 0;
+    let noRoomCount = 0;
+    
     for (const { date, score } of scoredDates) {
         if (score <= -99999) continue;
+        triedDates++;
 
         // التحقق من الحد الأقصى لمشاركة الأستاذ في اليوم
-        const overloaded = professors.some(prof => {
+        const overloadedProfs = professors.filter(prof => {
             const c = profConstraints[prof] || {};
             const max = c.maxPerDay || generalConstraints.maxProfPerDay;
             let count = 0;
             SCHEDULE_TIMES.forEach(t => { if (profOcc[date]?.[t]?.has(prof)) count++; });
             return count >= max;
         });
-        if (overloaded) continue;
+        if (overloadedProfs.length > 0) {
+            profOverloadCount++;
+            failureReasons.push(`${date}: الأساتذة (${overloadedProfs.join(', ')}) وصلوا للحد الأقصى`);
+            continue;
+        }
 
         // الشرط العام: تجنب تزامن نفس التخصص
         let specConflictTimes = [];
         if (generalConstraints.avoidSameSpec) {
             specConflictTimes = SCHEDULE_TIMES.filter(time => {
-                // البحث عن مذكرات في نفس الوقت لنفس التخصص
                 const roomsInTime = roomOcc[date]?.[time];
                 if (!roomsInTime) return false;
-                // يجب التحقق من المذكرات المجدولة - ولكن هذا يتطلب وصول للنتائج
-                // نستخدم تقدير بسيط: إذا كان هناك مناقشات، نتجنب
                 return Object.keys(roomsInTime).length > 0;
             });
         }
@@ -4652,21 +4705,137 @@ function findBestSlotWithGeneralConstraints(thesis, availableDates, rooms, profC
 
         for (const time of timesToTry) {
             // التحقق من عدم تضارب الأساتذة
-            if (professors.some(prof => profOcc[date]?.[time]?.has(prof))) continue;
+            const conflictingProfs = professors.filter(prof => profOcc[date]?.[time]?.has(prof));
+            if (conflictingProfs.length > 0) {
+                profConflictCount++;
+                continue;
+            }
             
             // الشرط العام: عدد المناقشات المتزامنة
-            const currentConcurrent = profOcc[date]?.[time] ? profOcc[date][time].size / 3 : 0; // تقريبي
-            if (currentConcurrent >= generalConstraints.maxConcurrent) continue;
+            const currentConcurrent = profOcc[date]?.[time] ? profOcc[date][time].size / 3 : 0;
+            if (currentConcurrent >= generalConstraints.maxConcurrent) {
+                concurrentLimitCount++;
+                continue;
+            }
             
             // البحث عن قاعة متاحة
+            let foundRoom = false;
             for (const room of rooms) {
                 if (!roomOcc[date]?.[time]?.[room]) {
-                    return { date, time, room };
+                    return { slot: { date, time, room }, reasons: [] };
                 }
             }
+            if (!foundRoom) noRoomCount++;
         }
     }
-    return null;
+    
+    // إضافة ملخص أسباب الفشل
+    if (triedDates === 0) {
+        failureReasons.push('❌ لا توجد تواريخ صالحة حسب الشروط المحددة');
+    } else {
+        if (profOverloadCount > 0) failureReasons.push(`⚠️ تجاوز الحد الأقصى لمشاركة الأساتذة في ${profOverloadCount} يوم`);
+        if (profConflictCount > 0) failureReasons.push(`⚠️ تضارب أوقات الأساتذة في ${profConflictCount} وقت`);
+        if (concurrentLimitCount > 0) failureReasons.push(`⚠️ تجاوز الحد الأقصى للمناقشات المتزامنة`);
+        if (noRoomCount > 0) failureReasons.push(`⚠️ لا توجد قاعات متاحة في الأوقات المناسبة`);
+    }
+    
+    return { slot: null, reasons: failureReasons };
+}
+
+// دالة تحليل أسباب الفشل واقتراح الحلول
+function analyzeSuggestionsForFailure(reasons, thesis, profConstraints, generalConstraints) {
+    const suggestions = [];
+    const reasonsText = reasons.join(' ');
+    
+    // تحليل الأسباب واقتراح الحلول
+    if (reasonsText.includes('الحد الأقصى') && reasonsText.includes('مذكرة/يوم')) {
+        suggestions.push({
+            icon: '📊',
+            title: 'زيادة الحد الأقصى للمذكرات في اليوم',
+            description: `الحد الحالي: ${generalConstraints.maxThesesPerDay} مذكرة/يوم`,
+            action: `زيادة الحد إلى ${generalConstraints.maxThesesPerDay + 2} أو أكثر`
+        });
+    }
+    
+    if (reasonsText.includes('وصلوا للحد الأقصى') || reasonsText.includes('تجاوز الحد الأقصى لمشاركة الأساتذة')) {
+        suggestions.push({
+            icon: '👨‍🏫',
+            title: 'زيادة الحد الأقصى لمشاركة الأستاذ',
+            description: `الحد الحالي: ${generalConstraints.maxProfPerDay} مناقشة/يوم للأستاذ`,
+            action: `زيادة الحد إلى ${generalConstraints.maxProfPerDay + 1} أو إضافة أيام أخرى`
+        });
+    }
+    
+    if (reasonsText.includes('تضارب أوقات الأساتذة')) {
+        suggestions.push({
+            icon: '⏰',
+            title: 'توسيع النطاق الزمني',
+            description: 'توجد تضاربات في أوقات الأساتذة',
+            action: 'إضافة المزيد من الأيام أو توسيع الفترة الزمنية'
+        });
+    }
+    
+    if (reasonsText.includes('المناقشات المتزامنة')) {
+        suggestions.push({
+            icon: '🔀',
+            title: 'زيادة عدد المناقشات المتزامنة',
+            description: `الحد الحالي: ${generalConstraints.maxConcurrent} مناقشة متزامنة`,
+            action: `زيادة الحد إلى ${generalConstraints.maxConcurrent + 1} أو أكثر`
+        });
+    }
+    
+    if (reasonsText.includes('لا توجد قاعات متاحة')) {
+        suggestions.push({
+            icon: '🏛️',
+            title: 'إضافة المزيد من القاعات',
+            description: 'القاعات المتاحة ممتلئة في الأوقات المناسبة',
+            action: 'إضافة قاعات جديدة من صفحة إدارة القاعات'
+        });
+    }
+    
+    if (reasonsText.includes('محظور')) {
+        const professors = [thesis.supervisor, thesis.president, thesis.examiner].filter(Boolean);
+        const blockedProfs = professors.filter(prof => {
+            const c = profConstraints[prof] || {};
+            return c.unavailableDates && c.unavailableDates.length > 0;
+        });
+        if (blockedProfs.length > 0) {
+            suggestions.push({
+                icon: '🚫',
+                title: 'مراجعة التواريخ المحظورة للأساتذة',
+                description: `الأساتذة: ${blockedProfs.join(', ')}`,
+                action: 'تقليل عدد التواريخ المحظورة أو توسيع الفترة الزمنية'
+            });
+        }
+    }
+    
+    if (reasonsText.includes('يومين متتابعين')) {
+        suggestions.push({
+            icon: '📅',
+            title: 'تعديل شرط اليومين المتتابعين',
+            description: 'بعض الأساتذة يشترطون يومين متتابعين فقط',
+            action: 'إلغاء هذا الشرط أو تأجيل جدولة هذه المذكرة'
+        });
+    }
+    
+    if (reasonsText.includes('تخصيص الأيام')) {
+        suggestions.push({
+            icon: '🗓️',
+            title: 'توسيع تخصيص أيام الشعب',
+            description: `الشعبة: ${thesis.branch}`,
+            action: 'إضافة المزيد من الأيام لهذه الشعبة أو إلغاء التخصيص'
+        });
+    }
+    
+    // اقتراح عام دائماً
+    suggestions.push({
+        icon: '🔄',
+        title: 'إعادة المحاولة بشروط أكثر مرونة',
+        description: 'قد تحتاج إلى تخفيف بعض القيود',
+        action: 'تقليل القيود الخاصة بالأساتذة أو الشروط العامة'
+    });
+    
+    return suggestions;
 }
 
 function runSmartScheduling(startDate, endDate, excludeDays, profConstraints, generalConstraints) {
@@ -4712,13 +4881,14 @@ function runSmartScheduling(startDate, endDate, excludeDays, profConstraints, ge
     const dateCount = {}; // عدد المذكرات لكل يوم
     
     for (const thesis of sorted) {
-        const slot = findBestSlotWithGeneralConstraints(
+        const result = findBestSlotWithGeneralConstraints(
             thesis, availableDates, rooms, profConstraints, generalConstraints,
             roomOcc, profOcc, profDays, dateCount
         );
-        if (slot) {
-            results.push({ thesis, ...slot });
-            const { date, time, room } = slot;
+        
+        if (result.slot) {
+            const { date, time, room } = result.slot;
+            results.push({ thesis, date, time, room });
             
             // تحديث الخرائط
             if (!roomOcc[date]) roomOcc[date] = {};
@@ -4736,15 +4906,12 @@ function runSmartScheduling(startDate, endDate, excludeDays, profConstraints, ge
             
             // تحديث عداد اليوم
             dateCount[date] = (dateCount[date] || 0) + 1;
-            if (!profOcc[date]) profOcc[date] = {};
-            if (!profOcc[date][time]) profOcc[date][time] = new Set();
-            [thesis.supervisor, thesis.president, thesis.examiner].filter(Boolean).forEach(p => {
-                profOcc[date][time].add(p);
-                if (!profDays[p]) profDays[p] = new Set();
-                profDays[p].add(date);
-            });
         } else {
-            failed.push(thesis);
+            failed.push({ 
+                thesis, 
+                reasons: result.reasons || ['لم يتم العثور على وقت مناسب'],
+                suggestions: analyzeSuggestionsForFailure(result.reasons, thesis, profConstraints, generalConstraints)
+            });
         }
     }
     return { results, failed };
