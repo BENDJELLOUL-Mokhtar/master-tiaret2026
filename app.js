@@ -1081,7 +1081,7 @@ function showPage(pageId) {
 
 function updateDashboard() {
     // استخدام البيانات المفلترة حسب دور المستخدم
-    const displayTheses = filteredTheses.length > 0 ? filteredTheses : theses;
+    const displayTheses = getVisibleThesesForUser();
     
     // إجمالي المذكرات
     document.getElementById('total-theses').textContent = displayTheses.length;
@@ -1128,7 +1128,9 @@ function updateDashboard() {
 
 function displayRecentTheses() {
     const container = document.getElementById('recent-theses-table');
-    const displayTheses = filteredTheses.length > 0 ? filteredTheses : theses;
+    if (!container) return;
+
+    const displayTheses = getVisibleThesesForUser();
     const recentTheses = [...displayTheses].reverse().slice(0, 10);
 
     if (recentTheses.length === 0) {
@@ -2327,10 +2329,11 @@ function updateProfessorsPage() {
     populateProfessorSearchDropdown();
 }
 
-function getProfessorsStats() {
+function getProfessorsStats(thesesData = null) {
     const stats = {};
+    const dataSource = thesesData || getVisibleThesesForUser();
 
-    theses.forEach(thesis => {
+    dataSource.forEach(thesis => {
         // الإشراف
         if (thesis.supervisor) {
             if (!stats[thesis.supervisor]) {
@@ -2367,7 +2370,8 @@ function getProfessorsStats() {
 
 function updateProfessorsFromTheses() {
     const professors = new Set();
-    theses.forEach(thesis => {
+    const visibleTheses = getVisibleThesesForUser();
+    visibleTheses.forEach(thesis => {
         if (thesis.supervisor) professors.add(thesis.supervisor);
         if (thesis.president) professors.add(thesis.president);
         if (thesis.examiner) professors.add(thesis.examiner);
@@ -2634,7 +2638,8 @@ function updateStatisticsPage() {
 }
 
 function getStatsBySpecialization(specialization) {
-    return getStatsBySpecializationFromData(theses, specialization);
+    const visibleTheses = getVisibleThesesForUser();
+    return getStatsBySpecializationFromData(visibleTheses, specialization);
 }
 
 function getStatsBySpecializationFromData(data, specialization) {
@@ -2676,8 +2681,9 @@ function populateProfessorSearchDropdown() {
 
     // جمع أسماء الأساتذة من لجان المناقشة في المذكرات فقط
     const professorsSet = new Set();
+    const visibleTheses = getVisibleThesesForUser();
     
-    theses.forEach(thesis => {
+    visibleTheses.forEach(thesis => {
         if (thesis.supervisor && thesis.supervisor.trim()) {
             professorsSet.add(thesis.supervisor.trim());
         }
@@ -2715,7 +2721,8 @@ function searchProfessorTheses() {
     }
 
     // البحث عن جميع المذكرات التي شارك فيها الأستاذ المحدد
-    const professorTheses = theses.filter(thesis => {
+    const visibleTheses = getVisibleThesesForUser();
+    const professorTheses = visibleTheses.filter(thesis => {
         const supervisor = thesis.supervisor?.trim() || '';
         const president = thesis.president?.trim() || '';
         const examiner = thesis.examiner?.trim() || '';
@@ -2982,7 +2989,9 @@ function exportToExcel() {
         return;
     }
 
-    if (theses.length === 0) {
+    const visibleTheses = getVisibleThesesForUser();
+
+    if (visibleTheses.length === 0) {
         showToast('لا توجد بيانات للتصدير', 'error');
         return;
     }
@@ -2990,7 +2999,7 @@ function exportToExcel() {
     const wb = XLSX.utils.book_new();
 
     // ورقة المذكرات
-    const thesesData = theses.map(t => ({
+    const thesesData = visibleTheses.map(t => ({
         'رقم المذكرة': t.thesis_number,
         'موضوع المذكرة': t.title,
         'الطالب الأول': t.student1,
@@ -3013,7 +3022,7 @@ function exportToExcel() {
     XLSX.utils.book_append_sheet(wb, ws1, 'المذكرات');
 
     // ورقة الإحصائيات
-    const stats = getProfessorsStats();
+    const stats = getProfessorsStats(visibleTheses);
     const statsData = stats.map(s => ({
         'الأستاذ': s.name,
         'الإشرافات': s.supervisions,
@@ -3996,8 +4005,21 @@ const SCHEDULE_ROOMS = [
 ];
 
 const PROF_CONSTRAINTS_KEY = 'smart_prof_constraints';
+const GENERAL_CONSTRAINTS_KEY = 'smart_general_constraints';
 let schedulingResults = null;
 let currentSchedStep = 1;
+
+// أيام الأسبوع بالعربية للمطابقة
+const ARABIC_DAYS = {
+    'السبت': 6, 'الأحد': 0, 'الإثنين': 1, 'الاثنين': 1,
+    'الثلاثاء': 2, 'الأربعاء': 3, 'الخميس': 4, 'الجمعة': 5
+};
+
+const BRANCH_MAPPING = {
+    'دراسات لغوية': 'linguistic',
+    'دراسات أدبية': 'literary', 
+    'دراسات نقدية': 'critical'
+};
 
 function getAvailableRooms() {
     const roomSelect = document.getElementById('room');
@@ -4006,6 +4028,115 @@ function getAvailableRooms() {
         if (opts.length > 0) return opts;
     }
     return SCHEDULE_ROOMS;
+}
+
+// دوال الشروط العامة
+function getGeneralConstraints() {
+    try {
+        const saved = localStorage.getItem(GENERAL_CONSTRAINTS_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch { }
+    // القيم الافتراضية
+    return {
+        maxThesesPerDay: 10,
+        maxProfPerDay: 3,
+        maxConcurrent: 5,
+        minGapMinutes: 15,
+        priority: 'random',
+        evenDistribution: false,
+        avoidSameSpec: false,
+        groupByBranch: false,
+        branchDays: {
+            linguistic: [],
+            literary: [],
+            critical: []
+        }
+    };
+}
+
+function saveGeneralConstraints(constraints) {
+    localStorage.setItem(GENERAL_CONSTRAINTS_KEY, JSON.stringify(constraints));
+}
+
+function loadGeneralConstraintsToUI() {
+    const gc = getGeneralConstraints();
+    const maxThesesEl = document.getElementById('sched-max-theses-per-day');
+    const maxProfEl = document.getElementById('sched-max-per-day');
+    const maxConcEl = document.getElementById('sched-max-concurrent');
+    const minGapEl = document.getElementById('sched-min-gap');
+    const priorityEl = document.getElementById('sched-priority');
+    const evenDistEl = document.getElementById('sched-even-distribution');
+    const avoidSpecEl = document.getElementById('sched-avoid-same-spec');
+    const groupBranchEl = document.getElementById('sched-group-by-branch');
+
+    if (maxThesesEl) maxThesesEl.value = gc.maxThesesPerDay || 10;
+    if (maxProfEl) maxProfEl.value = gc.maxProfPerDay || 3;
+    if (maxConcEl) maxConcEl.value = gc.maxConcurrent || 5;
+    if (minGapEl) minGapEl.value = gc.minGapMinutes || 15;
+    if (priorityEl) priorityEl.value = gc.priority || 'random';
+    if (evenDistEl) evenDistEl.checked = gc.evenDistribution || false;
+    if (avoidSpecEl) avoidSpecEl.checked = gc.avoidSameSpec || false;
+    if (groupBranchEl) {
+        groupBranchEl.checked = gc.groupByBranch || false;
+        toggleBranchDayAssignment();
+    }
+
+    // تحميل تخصيص أيام الشعب
+    if (gc.branchDays) {
+        const lingEl = document.getElementById('branch-days-linguistic');
+        const litEl = document.getElementById('branch-days-literary');
+        const critEl = document.getElementById('branch-days-critical');
+        if (lingEl) lingEl.value = gc.branchDays.linguistic?.join(',') || '';
+        if (litEl) litEl.value = gc.branchDays.literary?.join(',') || '';
+        if (critEl) critEl.value = gc.branchDays.critical?.join(',') || '';
+    }
+}
+
+function saveGeneralConstraintsFromUI() {
+    const maxThesesEl = document.getElementById('sched-max-theses-per-day');
+    const maxProfEl = document.getElementById('sched-max-per-day');
+    const maxConcEl = document.getElementById('sched-max-concurrent');
+    const minGapEl = document.getElementById('sched-min-gap');
+    const priorityEl = document.getElementById('sched-priority');
+    const evenDistEl = document.getElementById('sched-even-distribution');
+    const avoidSpecEl = document.getElementById('sched-avoid-same-spec');
+    const groupBranchEl = document.getElementById('sched-group-by-branch');
+    
+    const lingEl = document.getElementById('branch-days-linguistic');
+    const litEl = document.getElementById('branch-days-literary');
+    const critEl = document.getElementById('branch-days-critical');
+
+    const constraints = {
+        maxThesesPerDay: parseInt(maxThesesEl?.value) || 10,
+        maxProfPerDay: parseInt(maxProfEl?.value) || 3,
+        maxConcurrent: parseInt(maxConcEl?.value) || 5,
+        minGapMinutes: parseInt(minGapEl?.value) || 15,
+        priority: priorityEl?.value || 'random',
+        evenDistribution: evenDistEl?.checked || false,
+        avoidSameSpec: avoidSpecEl?.checked || false,
+        groupByBranch: groupBranchEl?.checked || false,
+        branchDays: {
+            linguistic: parseDaysList(lingEl?.value || ''),
+            literary: parseDaysList(litEl?.value || ''),
+            critical: parseDaysList(critEl?.value || '')
+        }
+    };
+
+    saveGeneralConstraints(constraints);
+    return constraints;
+}
+
+function parseDaysList(str) {
+    if (!str || !str.trim()) return [];
+    return str.split(',').map(d => d.trim()).filter(d => d);
+}
+
+function toggleBranchDayAssignment() {
+    const checkbox = document.getElementById('sched-group-by-branch');
+    const container = document.getElementById('branch-day-assignment');
+    if (container) {
+        container.style.display = checkbox?.checked ? 'block' : 'none';
+    }
 }
 
 function getProfConstraints() {
@@ -4022,11 +4153,13 @@ function openSchedulingModal() {
         showToast('ليس لديك صلاحية الجدولة', 'error');
         return;
     }
-    if (theses.length === 0) {
+    const visibleTheses = getVisibleThesesForUser();
+    if (visibleTheses.length === 0) {
         showToast('لا توجد مذكرات لجدولتها', 'warning');
         return;
     }
     currentSchedStep = 1;
+    loadGeneralConstraintsToUI(); // تحميل الشروط العامة
     updateSchedSummary();
     showSchedStep(1);
     document.getElementById('scheduling-modal').style.display = 'block';
@@ -4064,6 +4197,9 @@ function schedNext() {
         const end   = document.getElementById('sched-end-date').value;
         if (!start || !end) { showToast('الرجاء تحديد تاريخ البداية والنهاية', 'error'); return; }
         if (new Date(end) < new Date(start)) { showToast('تاريخ النهاية يجب أن يكون بعد البداية', 'error'); return; }
+        
+        // حفظ الشروط العامة
+        saveGeneralConstraintsFromUI();
     }
     if (currentSchedStep === 2) saveConstraintsFromUI();
     showSchedStep(currentSchedStep + 1);
@@ -4072,20 +4208,22 @@ function schedNext() {
 function schedPrev() { showSchedStep(currentSchedStep - 1); }
 
 function updateSchedSummary() {
-    const unscheduled = theses.filter(t => !t.defense_date || !t.defense_time || !t.room);
-    const scheduled   = theses.filter(t =>  t.defense_date &&  t.defense_time &&  t.room);
+    const visibleTheses = getVisibleThesesForUser();
+    const unscheduled = visibleTheses.filter(t => !t.defense_date || !t.defense_time || !t.room);
+    const scheduled   = visibleTheses.filter(t =>  t.defense_date &&  t.defense_time &&  t.room);
     const el = document.getElementById('sched-summary');
     if (!el) return;
     el.innerHTML = `
-        <div class="sched-stat"><span class="sched-stat-num">${theses.length}</span><span>إجمالي المذكرات</span></div>
+        <div class="sched-stat"><span class="sched-stat-num">${visibleTheses.length}</span><span>إجمالي المذكرات</span></div>
         <div class="sched-stat scheduled"><span class="sched-stat-num">${scheduled.length}</span><span>✅ مجدولة</span></div>
         <div class="sched-stat pending"><span class="sched-stat-num">${unscheduled.length}</span><span>⏳ تحتاج جدولة</span></div>
     `;
 }
 
 function buildProfConstraintsUI() {
+    const visibleTheses = getVisibleThesesForUser();
     const profSet = new Set();
-    theses.filter(t => !t.defense_date || !t.defense_time || !t.room).forEach(t => {
+    visibleTheses.filter(t => !t.defense_date || !t.defense_time || !t.room).forEach(t => {
         if (t.supervisor) profSet.add(t.supervisor);
         if (t.president)  profSet.add(t.president);
         if (t.examiner)   profSet.add(t.examiner);
@@ -4100,7 +4238,7 @@ function buildProfConstraintsUI() {
     }
     container.innerHTML = profs.map(prof => {
         const c = saved[prof] || {};
-        const count = theses.filter(t => t.supervisor === prof || t.president === prof || t.examiner === prof).length;
+        const count = visibleTheses.filter(t => t.supervisor === prof || t.president === prof || t.examiner === prof).length;
         const safeProf = prof.replace(/"/g, '&quot;');
         return `
         <div class="prof-constraint-card" data-prof="${safeProf}">
@@ -4175,12 +4313,12 @@ function runAndPreviewScheduling() {
     const startDate    = document.getElementById('sched-start-date').value;
     const endDate      = document.getElementById('sched-end-date').value;
     const excludeDays  = Array.from(document.querySelectorAll('input[name="exclude-day"]:checked')).map(cb => parseInt(cb.value));
-    const maxProfPerDay = parseInt(document.getElementById('sched-max-per-day').value) || 3;
-    const constraints  = getProfConstraints();
+    const profConstraints = getProfConstraints();
+    const generalConstraints = getGeneralConstraints();
     const preview = document.getElementById('scheduling-preview');
     preview.innerHTML = '<div style="text-align:center;padding:40px;font-size:1.1rem;">⏳ جاري التحليل الذكي...</div>';
     setTimeout(() => {
-        schedulingResults = runSmartScheduling(startDate, endDate, excludeDays, maxProfPerDay, constraints);
+        schedulingResults = runSmartScheduling(startDate, endDate, excludeDays, profConstraints, generalConstraints);
         renderSchedulingPreview(schedulingResults);
     }, 400);
 }
@@ -4381,34 +4519,223 @@ function findBestSlot(thesis, availableDates, rooms, constraints, roomOcc, profO
     return null;
 }
 
-function runSmartScheduling(startDate, endDate, excludeDays, maxProfPerDay, constraints) {
+// دالة محسّنة مع الشروط العامة
+function findBestSlotWithGeneralConstraints(thesis, availableDates, rooms, profConstraints, generalConstraints, roomOcc, profOcc, profDays, dateCount) {
+    const professors = [thesis.supervisor, thesis.president, thesis.examiner].filter(Boolean);
+    
+    // قيود اليومين المتتابعين لكل أستاذ
+    const twoDay = {};
+    for (const prof of professors) {
+        const c = profConstraints[prof] || {};
+        if (!c.twoDaysOnly) continue;
+        if (profDays[prof] && profDays[prof].size >= 2) {
+            const sorted = Array.from(profDays[prof]).sort();
+            twoDay[prof] = sorted.slice(0, 2);
+        } else if (profDays[prof] && profDays[prof].size === 1) {
+            const first = Array.from(profDays[prof])[0];
+            const next = new Date(first + 'T00:00:00');
+            next.setDate(next.getDate() + 1);
+            twoDay[prof] = [first, next.toISOString().split('T')[0]];
+        } else if (c.twoDaysStart) {
+            const d1 = c.twoDaysStart;
+            const d2obj = new Date(d1 + 'T00:00:00');
+            d2obj.setDate(d2obj.getDate() + 1);
+            twoDay[prof] = [d1, d2obj.toISOString().split('T')[0]];
+        }
+    }
+
+    // فلترة التواريخ حسب الشروط العامة: تخصيص الأيام للشعب
+    let filteredDates = [...availableDates];
+    if (generalConstraints.groupByBranch && generalConstraints.branchDays) {
+        const branchType = BRANCH_MAPPING[thesis.branch];
+        if (branchType && generalConstraints.branchDays[branchType]?.length > 0) {
+            const allowedDays = generalConstraints.branchDays[branchType];
+            filteredDates = availableDates.filter(dateStr => {
+                const d = new Date(dateStr + 'T00:00:00');
+                const dayName = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][d.getDay()];
+                return allowedDays.some(allowed => allowed.includes(dayName));
+            });
+            if (filteredDates.length === 0) filteredDates = [...availableDates]; // عدم حظر كامل
+        }
+    }
+
+    // حساب درجة جاذبية كل تاريخ
+    const scoredDates = filteredDates.map(date => {
+        let score = 0;
+        const currentCount = dateCount[date] || 0;
+        
+        // الشرط العام: الحد الأقصى للمذكرات في اليوم
+        if (currentCount >= generalConstraints.maxThesesPerDay) {
+            return { date, score: -99999 };
+        }
+        
+        // الشرط العام: التوزيع المتساوي
+        if (generalConstraints.evenDistribution) {
+            const avgPerDay = Object.values(dateCount).reduce((a, b) => a + b, 0) / Object.keys(dateCount).length || 0;
+            if (currentCount < avgPerDay) score += 10;
+            else if (currentCount > avgPerDay) score -= 5;
+        }
+        
+        // فحص قيود الأساتذة
+        for (const prof of professors) {
+            const c = profConstraints[prof] || {};
+
+            // تاريخ محظور
+            if (c.unavailableDates && c.unavailableDates.includes(date)) {
+                return { date, score: -99999 };
+            }
+
+            // يومين متتابعين فقط
+            if (c.twoDaysOnly) {
+                const allowed = twoDay[prof];
+                if (allowed) {
+                    if (!allowed.includes(date)) return { date, score: -99999 };
+                    score += 20;
+                } else {
+                    score += 5;
+                }
+            }
+
+            // مكافأة الأيام المتتالية
+            if (c.consecutiveDays && profDays[prof] && profDays[prof].size > 0) {
+                const sortedD = Array.from(profDays[prof]).sort();
+                const lastDate = sortedD[sortedD.length - 1];
+                const diff = daysDiffSched(lastDate, date);
+                if (diff === 0) score += 8;
+                else if (diff === 1) score += 15;
+                else if (diff === 2) score += 4;
+                else score -= Math.min(diff, 10);
+            }
+        }
+
+        return { date, score };
+    }).sort((a, b) => b.score - a.score);
+
+    // البحث عن أفضل وقت وقاعة
+    for (const { date, score } of scoredDates) {
+        if (score <= -99999) continue;
+
+        // التحقق من الحد الأقصى لمشاركة الأستاذ في اليوم
+        const overloaded = professors.some(prof => {
+            const c = profConstraints[prof] || {};
+            const max = c.maxPerDay || generalConstraints.maxProfPerDay;
+            let count = 0;
+            SCHEDULE_TIMES.forEach(t => { if (profOcc[date]?.[t]?.has(prof)) count++; });
+            return count >= max;
+        });
+        if (overloaded) continue;
+
+        // الشرط العام: تجنب تزامن نفس التخصص
+        let specConflictTimes = [];
+        if (generalConstraints.avoidSameSpec) {
+            specConflictTimes = SCHEDULE_TIMES.filter(time => {
+                // البحث عن مذكرات في نفس الوقت لنفس التخصص
+                const roomsInTime = roomOcc[date]?.[time];
+                if (!roomsInTime) return false;
+                // يجب التحقق من المذكرات المجدولة - ولكن هذا يتطلب وصول للنتائج
+                // نستخدم تقدير بسيط: إذا كان هناك مناقشات، نتجنب
+                return Object.keys(roomsInTime).length > 0;
+            });
+        }
+
+        // تحديد ترتيب الأوقات حسب التفضيل
+        let timesToTry = [...SCHEDULE_TIMES];
+        const morningCount = professors.filter(p => profConstraints[p]?.preferredTime === 'morning').length;
+        const afternoonCount = professors.filter(p => profConstraints[p]?.preferredTime === 'afternoon').length;
+        if (afternoonCount > morningCount) timesToTry = [...SCHEDULE_TIMES].reverse();
+
+        // فلترة الأوقات لتجنب تضارب التخصص
+        if (generalConstraints.avoidSameSpec) {
+            timesToTry = timesToTry.filter(t => !specConflictTimes.includes(t));
+            if (timesToTry.length === 0) timesToTry = [...SCHEDULE_TIMES];
+        }
+
+        for (const time of timesToTry) {
+            // التحقق من عدم تضارب الأساتذة
+            if (professors.some(prof => profOcc[date]?.[time]?.has(prof))) continue;
+            
+            // الشرط العام: عدد المناقشات المتزامنة
+            const currentConcurrent = profOcc[date]?.[time] ? profOcc[date][time].size / 3 : 0; // تقريبي
+            if (currentConcurrent >= generalConstraints.maxConcurrent) continue;
+            
+            // البحث عن قاعة متاحة
+            for (const room of rooms) {
+                if (!roomOcc[date]?.[time]?.[room]) {
+                    return { date, time, room };
+                }
+            }
+        }
+    }
+    return null;
+}
+
+function runSmartScheduling(startDate, endDate, excludeDays, profConstraints, generalConstraints) {
+    const visibleTheses = getVisibleThesesForUser();
     const rooms          = getAvailableRooms();
     const availableDates = generateDateRange(startDate, endDate, excludeDays);
     if (availableDates.length === 0) return { error: 'لا توجد تواريخ متاحة في النطاق المحدد' };
-    const unscheduled = theses.filter(t => !t.defense_date || !t.defense_time || !t.room);
+    const unscheduled = visibleTheses.filter(t => !t.defense_date || !t.defense_time || !t.room);
     if (unscheduled.length === 0) return { error: 'جميع المذكرات مجدولة بالفعل' };
-    const scheduled = theses.filter(t => t.defense_date && t.defense_time && t.room);
+    const scheduled = visibleTheses.filter(t => t.defense_date && t.defense_time && t.room);
     const { roomOcc, profOcc, profDays } = buildOccupationMaps(scheduled);
-
-    // ترتيب المذكرات: الأكثر تقييداً أولاً
-    const sorted = [...unscheduled].sort((a, b) => {
+    
+    // تطبيق الشروط العامة: الأولوية
+    let sorted = [...unscheduled];
+    switch (generalConstraints.priority) {
+        case 'oldest':
+            sorted.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+            break;
+        case 'specialization':
+            sorted.sort((a, b) => a.specialization.localeCompare(b.specialization, 'ar'));
+            break;
+        case 'branch':
+            sorted.sort((a, b) => a.branch.localeCompare(b.branch, 'ar'));
+            break;
+        case 'supervisor':
+            sorted.sort((a, b) => a.supervisor.localeCompare(b.supervisor, 'ar'));
+            break;
+        default: // random
+            sorted = sorted.sort(() => Math.random() - 0.5);
+    }
+    
+    // ترتيب إضافي حسب القيود (الأكثر تقييداً أولاً)
+    sorted = sorted.sort((a, b) => {
         const score = thesis => [thesis.supervisor, thesis.president, thesis.examiner]
             .filter(Boolean).reduce((s, p) => {
-                const c = constraints[p] || {};
+                const c = profConstraints[p] || {};
                 return s + (c.consecutiveDays ? 10 : 0) + (c.unavailableDates?.length || 0) * 2;
             }, 0);
         return score(b) - score(a);
     });
 
     const results = [], failed = [];
+    const dateCount = {}; // عدد المذكرات لكل يوم
+    
     for (const thesis of sorted) {
-        const slot = findBestSlot(thesis, availableDates, rooms, constraints, roomOcc, profOcc, profDays, maxProfPerDay);
+        const slot = findBestSlotWithGeneralConstraints(
+            thesis, availableDates, rooms, profConstraints, generalConstraints,
+            roomOcc, profOcc, profDays, dateCount
+        );
         if (slot) {
             results.push({ thesis, ...slot });
             const { date, time, room } = slot;
+            
+            // تحديث الخرائط
             if (!roomOcc[date]) roomOcc[date] = {};
             if (!roomOcc[date][time]) roomOcc[date][time] = {};
             roomOcc[date][time][room] = true;
+            
+            if (!profOcc[date]) profOcc[date] = {};
+            if (!profOcc[date][time]) profOcc[date][time] = new Set();
+            
+            [thesis.supervisor, thesis.president, thesis.examiner].filter(Boolean).forEach(p => {
+                profOcc[date][time].add(p);
+                if (!profDays[p]) profDays[p] = new Set();
+                profDays[p].add(date);
+            });
+            
+            // تحديث عداد اليوم
+            dateCount[date] = (dateCount[date] || 0) + 1;
             if (!profOcc[date]) profOcc[date] = {};
             if (!profOcc[date][time]) profOcc[date][time] = new Set();
             [thesis.supervisor, thesis.president, thesis.examiner].filter(Boolean).forEach(p => {
@@ -4429,6 +4756,7 @@ window.schedNext            = schedNext;
 window.schedPrev            = schedPrev;
 window.updateSchedSummary   = updateSchedSummary;
 window.applySchedulingResults = applySchedulingResults;
+window.toggleBranchDayAssignment = toggleBranchDayAssignment;
 
 // دوال إدارة الأساتذة
 window.syncProfessorsFromTheses = syncProfessorsFromTheses;
@@ -4520,7 +4848,8 @@ function renderTodaySchedule() {
         : `📋 مناقشات يوم — ${arabicDate}`;
 
     // فلترة المذكرات التي لها تاريخ مناقشة = اليوم المحدد
-    const dayTheses = theses.filter(t => t.defense_date === selectedISO)
+    const visibleTheses = getVisibleThesesForUser();
+    const dayTheses = visibleTheses.filter(t => t.defense_date === selectedISO)
         .sort((a, b) => (a.defense_time || '').localeCompare(b.defense_time || ''));
 
     const container = document.getElementById('schedule-today-table');
@@ -4601,13 +4930,14 @@ function renderWeeklyChart() {
     const weekDates = [];
     const todayISO  = toISODate(new Date());
     const selectedISO = toISODate(scheduleCurrentDate);
+    const visibleTheses = getVisibleThesesForUser();
 
     for (let i = 0; i < 7; i++) {
         const d = new Date(weekStart);
         d.setDate(weekStart.getDate() + i);
         const iso = toISODate(d);
         weekDates.push(iso);
-        const count = theses.filter(t => t.defense_date === iso).length;
+        const count = visibleTheses.filter(t => t.defense_date === iso).length;
         labels.push(dayNames[i]);
         counts.push(count);
         // لون خاص لليوم الحالي وليوم المحدد
