@@ -380,10 +380,10 @@ function updateUIForUser(user) {
         }
     });
     
-    // إظهار/إخفاء زر حذف كل المذكرات
+    // إظهار/إخفاء زر حذف كل المذكرات - نائب رئيس القسم فقط
     const deleteAllBtn = document.getElementById('delete-all-btn');
     if (deleteAllBtn) {
-        deleteAllBtn.style.display = hasPermission('delete') ? 'inline-flex' : 'none';
+        deleteAllBtn.style.display = (user.role === 'deputy') ? 'inline-flex' : 'none';
     }
 
     // إظهار/إخفاء زر الجدولة الذكية
@@ -1253,7 +1253,9 @@ function displayThesesTable() {
         if (hasPermission('edit')) {
             html += `<button onclick="editThesis('${thesis.id}')" class="btn btn-info btn-sm">✏️</button>`;
         }
-        if (hasPermission('delete')) {
+        // زر الحذف لنائب رئيس القسم فقط
+        const currentUser = getCurrentUser();
+        if (currentUser && currentUser.role === 'deputy') {
             html += `<button onclick="deleteThesis('${thesis.id}')" class="btn btn-danger btn-sm">🗑️</button>`;
         }
         html += `<button onclick="generatePDFForThesis('${thesis.id}')" class="btn btn-primary btn-sm">🖨️</button>`;
@@ -2081,9 +2083,10 @@ function resetForm() {
 }
 
 function deleteThesis(thesisId) {
-    // فحص الصلاحيات
-    if (!hasPermission('delete')) {
-        showToast('ليس لديك صلاحية الحذف', 'error');
+    // فحص الصلاحيات - نائب رئيس القسم فقط
+    const user = getCurrentUser();
+    if (!user || user.role !== 'deputy') {
+        showToast('⚠️ حذف المذكرات متاح فقط لنائب رئيس القسم', 'error');
         return;
     }
 
@@ -2099,8 +2102,10 @@ function deleteThesis(thesisId) {
 }
 
 function deleteAllTheses() {
-    if (!hasPermission('delete')) {
-        showToast('ليس لديك صلاحية الحذف', 'error');
+    // فحص الصلاحيات - نائب رئيس القسم فقط
+    const user = getCurrentUser();
+    if (!user || user.role !== 'deputy') {
+        showToast('⚠️ حذف المذكرات متاح فقط لنائب رئيس القسم', 'error');
         return;
     }
 
