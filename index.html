@@ -134,9 +134,50 @@
                         <option value="أستاذ مساعد ب">أستاذ مساعد ب</option>
                     </select>
                 </div>
+                <div class="form-group" id="reg-prof-birth-group" style="display: none;">
+                    <label for="reg-prof-birthdate">تاريخ الميلاد *</label>
+                    <input type="date" id="reg-prof-birthdate" placeholder="اختر تاريخ الميلاد">
+                </div>
+                <div class="form-group" id="reg-prof-spec-group" style="display: none;">
+                    <label for="reg-prof-spec">التخصص *</label>
+                    <select id="reg-prof-spec">
+                        <option value="">-- اختر التخصص --</option>
+                        <option value="لسانيات الخطاب">لسانيات الخطاب</option>
+                        <option value="تعليمية اللغات">تعليمية اللغات</option>
+                        <option value="أدب حديث ومعاصر">أدب حديث ومعاصر</option>
+                        <option value="نقد حديث ومعاصر">نقد حديث ومعاصر</option>
+                    </select>
+                </div>
                 <div class="form-group" id="reg-student-info" style="display: none;">
                     <label for="reg-student-id">رقم التسجيل (اختياري)</label>
                     <input type="text" id="reg-student-id" placeholder="مثال: M2026001">
+                </div>
+                <div class="form-group" id="reg-student-birth-group" style="display: none;">
+                    <label for="reg-student-birthdate">تاريخ الميلاد *</label>
+                    <input type="date" id="reg-student-birthdate" placeholder="اختر تاريخ الميلاد">
+                </div>
+                <div class="form-group" id="reg-student-birthplace-group" style="display: none;">
+                    <label for="reg-student-birthplace">مكان الميلاد *</label>
+                    <input type="text" id="reg-student-birthplace" placeholder="مثال: تيارت">
+                </div>
+                <div class="form-group" id="reg-student-birthwilaya-group" style="display: none;">
+                    <label for="reg-student-birthwilaya">ولاية الميلاد *</label>
+                    <input type="text" id="reg-student-birthwilaya" placeholder="مثال: تيارت">
+                </div>
+                <div class="form-group" id="reg-student-branch-group" style="display: none;">
+                    <label for="reg-student-branch">الشعبة *</label>
+                    <select id="reg-student-branch" onchange="updateStudentSpecializations()">
+                        <option value="">-- اختر الشعبة --</option>
+                        <option value="دراسات لغوية">دراسات لغوية</option>
+                        <option value="دراسات أدبية">دراسات أدبية</option>
+                        <option value="دراسات نقدية">دراسات نقدية</option>
+                    </select>
+                </div>
+                <div class="form-group" id="reg-student-spec-group" style="display: none;">
+                    <label for="reg-student-spec">التخصص *</label>
+                    <select id="reg-student-spec">
+                        <option value="">-- اختر التخصص --</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="reg-password">كلمة المرور *</label>
@@ -232,6 +273,11 @@
                 <a href="#" onclick="showPage('approval')" class="nav-item" data-page="approval">
                     <span class="icon">📄</span>
                     <span>قبول المناقشة</span>
+                </a>
+                <a href="#" onclick="showPage('registration-requests')" class="nav-item" data-page="registration-requests" id="registration-requests-nav" style="display: none;">
+                    <span class="icon">👥</span>
+                    <span>طلبات التسجيل</span>
+                    <span id="pending-count-badge" class="badge" style="background:#e74c3c;color:white;padding:2px 8px;border-radius:12px;font-size:0.75rem;margin-right:auto;">0</span>
                 </a>
             </nav>
         </aside>
@@ -752,6 +798,42 @@
                         <canvas id="chart-weekly-schedule"></canvas>
                     </div>
                     <div id="schedule-week-summary" style="margin-top:20px;"></div>
+                </div>
+            </div>
+
+            <!-- صفحة طلبات التسجيل -->
+            <div id="registration-requests" class="page">
+                <div class="page-header">
+                    <h2>👥 طلبات التسجيل المعلقة</h2>
+                    <p class="subtitle">مراجعة والموافقة على طلبات التسجيل الجديدة</p>
+                </div>
+
+                <div class="stats-grid" style="margin-bottom:20px;">
+                    <div class="stat-card warning">
+                        <div class="stat-icon">⏳</div>
+                        <div class="stat-content">
+                            <h3 id="reg-count-pending">0</h3>
+                            <p>طلبات معلقة</p>
+                        </div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-content">
+                            <h3 id="reg-count-approved">0</h3>
+                            <p>طلبات موافق عليها</p>
+                        </div>
+                    </div>
+                    <div class="stat-card danger">
+                        <div class="stat-icon">❌</div>
+                        <div class="stat-content">
+                            <h3 id="reg-count-rejected">0</h3>
+                            <p>طلبات مرفوضة</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="registration-requests-container">
+                    <!-- سيتم ملؤها ديناميكياً -->
                 </div>
             </div>
 

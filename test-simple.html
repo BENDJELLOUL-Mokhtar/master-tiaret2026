@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>اختبار بسيط - التسجيل</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #229954;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🧪 اختبار نموذج التسجيل البسيط</h2>
+        
+        <form id="testForm">
+            <label>الاسم الكامل:</label>
+            <input type="text" id="fullname" value="بن علي محمد" required>
+            
+            <label>الصفة:</label>
+            <select id="role" required>
+                <option value="">اختر</option>
+                <option value="professor">أستاذ</option>
+                <option value="student" selected>طالب</option>
+            </select>
+            
+            <label>كلمة المرور:</label>
+            <input type="password" id="password" value="test123" required>
+            
+            <label>تأكيد كلمة المرور:</label>
+            <input type="password" id="confirmPassword" value="test123" required>
+            
+            <button type="submit">✅ تسجيل</button>
+        </form>
+        
+        <div id="result"></div>
+        
+        <hr style="margin: 30px 0;">
+        <button onclick="checkLocalStorage()" style="background: #3498db;">
+            📦 عرض المستخدمين المحفوظين
+        </button>
+        
+        <div id="users" style="margin-top: 20px; padding: 15px; background: #ecf0f1; border-radius: 5px;"></div>
+    </div>
+
+    <script>
+        const USERS_KEY = 'platform_users';
+        
+        document.getElementById('testForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '';
+            
+            try {
+                const fullName = document.getElementById('fullname').value.trim();
+                const role = document.getElementById('role').value;
+                const password = document.getElementById('password').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+                
+                console.log('البيانات:', { fullName, role, password });
+                
+                // التحقق الأساسي
+                if (!fullName || !role || !password) {
+                    throw new Error('جميع الحقول مطلوبة');
+                }
+                
+                if (password !== confirmPassword) {
+                    throw new Error('كلمات المرور غير متطابقة');
+                }
+                
+                if (password.length < 6) {
+                    throw new Error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+                }
+                
+                // التحقق من الاسم
+                const parts = fullName.split(' ');
+                if (parts.length < 2) {
+                    throw new Error('يجب إدخال اللقب والاسم');
+                }
+                
+                // إنشاء المستخدم
+                const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+                
+                const newUser = {
+                    id: users.length + 1,
+                    username: fullName,
+                    password: password,
+                    fullName: fullName,
+                    role: role,
+                    roleAr: role === 'professor' ? 'أستاذ' : 'طالب',
+                    title: role === 'professor' ? 'أستاذ' : 'طالب ماستر',
+                    permissions: role === 'professor' ? ['view', 'export'] : ['view'],
+                    registrationStatus: 'pending',
+                    registeredAt: new Date().toISOString()
+                };
+                
+                users.push(newUser);
+                localStorage.setItem(USERS_KEY, JSON.stringify(users));
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <strong>✅ نجح!</strong><br>
+                        تم إنشاء المستخدم بنجاح!<br>
+                        الاسم: ${fullName}<br>
+                        الصفة: ${newUser.roleAr}<br>
+                        الحالة: معلق (Pending)<br>
+                        <small>تم الحفظ في localStorage</small>
+                    </div>
+                `;
+                
+                // عرض المستخدمين
+                checkLocalStorage();
+                
+            } catch (error) {
+                console.error('خطأ:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <strong>❌ خطأ!</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        });
+        
+        function checkLocalStorage() {
+            const usersDiv = document.getElementById('users');
+            const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+            
+            if (users.length === 0) {
+                usersDiv.innerHTML = '<p>لا يوجد مستخدمون محفوظون</p>';
+                return;
+            }
+            
+            let html = `<h3>المستخدمون المحفوظون (${users.length}):</h3><ul style="text-align:right;">`;
+            users.forEach(user => {
+                const status = user.registrationStatus || 'غير محدد';
+                html += `<li><strong>${user.fullName}</strong> - ${user.roleAr} - <em>${status}</em></li>`;
+            });
+            html += '</ul>';
+            html += '<button onclick="clearUsers()" style="background:#e74c3c;margin-top:10px;">🗑️ مسح الكل</button>';
+            
+            usersDiv.innerHTML = html;
+        }
+        
+        function clearUsers() {
+            if (confirm('هل أنت متأكد من حذف جميع المستخدمين؟')) {
+                localStorage.removeItem(USERS_KEY);
+                checkLocalStorage();
+                alert('تم حذف جميع المستخدمين');
+            }
+        }
+        
+        // عرض المستخدمين عند تحميل الصفحة
+        window.onload = function() {
+            checkLocalStorage();
+        };
+    </script>
+</body>
+</html>
