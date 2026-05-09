@@ -1781,6 +1781,15 @@ function createStudent(name, additionalData = {}) {
 
 // استخراج الطلبة من المذكرات
 function syncStudentsFromTheses() {
+    // تحميل المذكرات من localStorage أولاً
+    loadData();
+    
+    // التحقق من وجود مذكرات
+    if (!theses || theses.length === 0) {
+        showToast('⚠️ لا توجد مذكرات في النظام. يجب إضافة مذكرات أولاً.', 'error');
+        return;
+    }
+    
     if (!confirm('سيتم استخراج أسماء جميع الطلبة من المذكرات وإضافتهم تلقائياً.\nالطلبة الموجودون مسبقاً لن يتأثروا.\nهل تريد المتابعة؟')) return;
     
     const studentsDB = loadStudentsDatabase();
@@ -1810,7 +1819,12 @@ function syncStudentsFromTheses() {
     
     saveStudentsDatabase(studentsDB);
     updateStudentsPage();
-    showToast(`✅ تم استخراج وإضافة ${addedCount} طالب جديد من المذكرات`, 'success');
+    
+    if (addedCount > 0) {
+        showToast(`✅ تم استخراج وإضافة ${addedCount} طالب جديد من ${theses.length} مذكرة`, 'success');
+    } else {
+        showToast(`ℹ️ تم فحص ${theses.length} مذكرة. جميع الطلبة موجودون مسبقاً أو لم يتم إدخال اسم الطالب في المذكرات`, 'info');
+    }
 }
 
 // استخراج الطلبة من طلبات التسجيل المعتمدة
