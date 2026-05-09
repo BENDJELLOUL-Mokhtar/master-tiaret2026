@@ -287,7 +287,25 @@ const DEFAULT_USERS = [
 function initializeUsers() {
     const stored = localStorage.getItem(USERS_KEY);
     if (!stored) {
-        localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS));
+        // إضافة حالة الموافقة لجميع المستخدمين الافتراضيين
+        const usersWithStatus = DEFAULT_USERS.map(user => ({
+            ...user,
+            registrationStatus: 'approved'
+        }));
+        localStorage.setItem(USERS_KEY, JSON.stringify(usersWithStatus));
+    } else {
+        // تحديث المستخدمين الحاليين لإضافة حالة الموافقة إن لم تكن موجودة
+        const users = JSON.parse(stored);
+        let updated = false;
+        users.forEach(user => {
+            if (!user.registrationStatus) {
+                user.registrationStatus = 'approved';
+                updated = true;
+            }
+        });
+        if (updated) {
+            localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        }
     }
 }
 
@@ -302,6 +320,18 @@ function handleLogin(event) {
     const user = users.find(u => u.username === username && u.password === password);
     
     if (user) {
+        // التحقق من حالة التسجيل
+        if (user.registrationStatus === 'pending') {
+            showToast('⏳ حسابك قيد المراجعة من قبل نائب رئيس القسم. الرجاء الانتظار', 'warning');
+            return;
+        }
+        
+        if (user.registrationStatus === 'rejected') {
+            const reason = user.rejectionReason || 'لم يتم تحديد السبب';
+            showToast(`❌ تم رفض طلب تسجيلك. السبب: ${reason}`, 'error');
+            return;
+        }
+        
         // حفظ المستخدم الحالي
         const currentUser = {
             id: user.id,
@@ -324,6 +354,9 @@ function handleLogin(event) {
         
         // تحديث واجهة المستخدم
         updateUIForUser(currentUser);
+        
+        // تحديث العداد في القائمة الجانبية
+        updatePendingRequestsCount();
         
         showToast(`أهلاً بك ${currentUser.fullName}`, 'success');
     } else {
@@ -384,6 +417,17 @@ function updateUIForUser(user) {
     const deleteAllBtn = document.getElementById('delete-all-btn');
     if (deleteAllBtn) {
         deleteAllBtn.style.display = (user.role === 'deputy') ? 'inline-flex' : 'none';
+    }
+
+    // إظهار/إخفاء رابط طلبات التسجيل - نائب رئيس القسم فقط
+    const regRequestsNav = document.getElementById('registration-requests-nav');
+    if (regRequestsNav) {
+        regRequestsNav.style.display = (user.role === 'deputy') ? 'flex' : 'none';
+    }
+    
+    // تحديث عداد طلبات التسجيل المعلقة
+    if (user.role === 'deputy') {
+        updatePendingRequestsCount();
     }
 
     // إظهار/إخفاء زر الجدولة الذكية
@@ -474,18 +518,120 @@ function updateRegisterFields() {
     const studentInfo = document.getElementById('reg-student-info');
     const titleField = document.getElementById('reg-title');
     
+    // حقول الأستاذ
+    const profBirthGroup = document.getElementById('reg-prof-birth-group');
+    const profSpecGroup = document.getElementById('reg-prof-spec-group');
+    const profBirthField = document.getElementById('reg-prof-birthdate');
+    const profSpecField = document.getElementById('reg-prof-spec');
+    
+    // حقول الطالب
+    const studentBirthGroup = document.getElementById('reg-student-birth-group');
+    const studentBirthplaceGroup = document.getElementById('reg-student-birthplace-group');
+    const studentBirthwilayaGroup = document.getElementById('reg-student-birthwilaya-group');
+    const studentBranchGroup = document.getElementById('reg-student-branch-group');
+    const studentSpecGroup = document.getElementById('reg-student-spec-group');
+    const studentBirthField = document.getElementById('reg-student-birthdate');
+    const studentBirthplaceField = document.getElementById('reg-student-birthplace');
+    const studentBirthwilayaField = document.getElementById('reg-student-birthwilaya');
+    const studentBranchField = document.getElementById('reg-student-branch');
+    const studentSpecField = document.getElementById('reg-student-spec');
+    
+    // التحقق من وجود العناصر
+    if (!titleGroup || !studentInfo || !titleField || !profBirthGroup || !profSpecGroup || 
+        !profBirthField || !profSpecField || !studentBirthGroup || !studentBirthplaceGroup || 
+        !studentBirthwilayaGroup || !studentBranchGroup || !studentSpecGroup || 
+        !studentBirthField || !studentBirthplaceField || !studentBirthwilayaField || 
+        !studentBranchField || !studentSpecField) {
+        console.error('بعض عناصر النموذج غير موجودة');
+        return;
+    }
+    
     if (role === 'professor') {
+        // إظهار حقول الأستاذ
         titleGroup.style.display = 'block';
-        studentInfo.style.display = 'none';
+        profBirthGroup.style.display = 'block';
+        profSpecGroup.style.display = 'block';
         titleField.required = true;
-    } else if (role === 'student') {
-        titleGroup.style.display = 'none';
-        studentInfo.style.display = 'block';
-        titleField.required = false;
-    } else {
-        titleGroup.style.display = 'none';
+        profBirthField.required = true;
+        profSpecField.required = true;
+        
+        // إخفاء حقول الطالب
         studentInfo.style.display = 'none';
+        studentBirthGroup.style.display = 'none';
+        studentBirthplaceGroup.style.display = 'none';
+        studentBirthwilayaGroup.style.display = 'none';
+        studentBranchGroup.style.display = 'none';
+        studentSpecGroup.style.display = 'none';
+        studentBirthField.required = false;
+        studentBirthplaceField.required = false;
+        studentBirthwilayaField.required = false;
+        studentBranchField.required = false;
+        studentSpecField.required = false;
+    } else if (role === 'student') {
+        // إظهار حقول الطالب
+        studentInfo.style.display = 'block';
+        studentBirthGroup.style.display = 'block';
+        studentBirthplaceGroup.style.display = 'block';
+        studentBirthwilayaGroup.style.display = 'block';
+        studentBranchGroup.style.display = 'block';
+        studentSpecGroup.style.display = 'block';
+        studentBirthField.required = true;
+        studentBirthplaceField.required = true;
+        studentBirthwilayaField.required = true;
+        studentBranchField.required = true;
+        studentSpecField.required = true;
+        
+        // إخفاء حقول الأستاذ
+        titleGroup.style.display = 'none';
+        profBirthGroup.style.display = 'none';
+        profSpecGroup.style.display = 'none';
         titleField.required = false;
+        profBirthField.required = false;
+        profSpecField.required = false;
+    } else {
+        // إخفاء جميع الحقول
+        titleGroup.style.display = 'none';
+        profBirthGroup.style.display = 'none';
+        profSpecGroup.style.display = 'none';
+        studentInfo.style.display = 'none';
+        studentBirthGroup.style.display = 'none';
+        studentBirthplaceGroup.style.display = 'none';
+        studentBirthwilayaGroup.style.display = 'none';
+        studentBranchGroup.style.display = 'none';
+        studentSpecGroup.style.display = 'none';
+        titleField.required = false;
+        profBirthField.required = false;
+        profSpecField.required = false;
+        studentBirthField.required = false;
+        studentBirthplaceField.required = false;
+        studentBirthwilayaField.required = false;
+        studentBranchField.required = false;
+        studentSpecField.required = false;
+    }
+}
+
+// تحديث التخصصات حسب الشعبة للطالب
+function updateStudentSpecializations() {
+    const branch = document.getElementById('reg-student-branch').value;
+    const specSelect = document.getElementById('reg-student-spec');
+    
+    // مسح الخيارات الحالية
+    specSelect.innerHTML = '<option value="">-- اختر التخصص --</option>';
+    
+    // إضافة التخصصات حسب الشعبة
+    const specializations = {
+        'دراسات لغوية': ['لسانيات الخطاب', 'تعليمية اللغات'],
+        'دراسات أدبية': ['أدب حديث ومعاصر'],
+        'دراسات نقدية': ['نقد حديث ومعاصر']
+    };
+    
+    if (branch && specializations[branch]) {
+        specializations[branch].forEach(spec => {
+            const option = document.createElement('option');
+            option.value = spec;
+            option.textContent = spec;
+            specSelect.appendChild(option);
+        });
     }
 }
 
@@ -519,81 +665,151 @@ function validateFullName(fullName) {
 function handleRegister(event) {
     event.preventDefault();
     
-    const fullName = document.getElementById('reg-fullname').value.trim();
-    const role = document.getElementById('reg-role').value;
-    const password = document.getElementById('reg-password').value;
-    const confirmPassword = document.getElementById('reg-password-confirm').value;
-    const title = document.getElementById('reg-title').value;
-    const studentId = document.getElementById('reg-student-id').value.trim();
+    try {
+        console.log('بدء معالجة التسجيل...');
+        
+        const fullName = document.getElementById('reg-fullname').value.trim();
+        const role = document.getElementById('reg-role').value;
+        const password = document.getElementById('reg-password').value;
+        const confirmPassword = document.getElementById('reg-password-confirm').value;
+        const title = document.getElementById('reg-title').value;
+        const studentId = document.getElementById('reg-student-id').value.trim();
+        
+        console.log('البيانات الأساسية:', { fullName, role, password });
+        
+        // التحقق من الاسم الكامل
+        const nameValidation = validateFullName(fullName);
+        if (!nameValidation.valid) {
+            showToast(nameValidation.message, 'error');
+            return;
+        }
+        
+        // التحقق من تطابق كلمة المرور
+        if (password !== confirmPassword) {
+            showToast('كلمات المرور غير متطابقة', 'error');
+            return;
+        }
+        
+        // التحقق من طول كلمة المرور
+        if (password.length < 6) {
+            showToast('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
+            return;
+        }
+        
+        // التحقق من الرتبة للأستاذ
+        if (role === 'professor' && !title) {
+            showToast('يجب اختيار الرتبة العلمية', 'error');
+            return;
+        }
+        
+        // التحقق من الحقول الإضافية للأستاذ
+        let profBirthDate = '';
+        let profSpec = '';
+        if (role === 'professor') {
+            profBirthDate = document.getElementById('reg-prof-birthdate').value;
+            profSpec = document.getElementById('reg-prof-spec').value;
+            
+            if (!profBirthDate) {
+                showToast('يجب إدخال تاريخ الميلاد', 'error');
+                return;
+            }
+            if (!profSpec) {
+                showToast('يجب اختيار التخصص', 'error');
+                return;
+            }
+        }
+        
+        // التحقق من الحقول الإضافية للطالب
+        let studentBirthDate = '';
+        let studentBirthPlace = '';
+        let studentBirthWilaya = '';
+        let studentBranch = '';
+        let studentSpec = '';
+        if (role === 'student') {
+            studentBirthDate = document.getElementById('reg-student-birthdate').value;
+            studentBirthPlace = document.getElementById('reg-student-birthplace').value.trim();
+            studentBirthWilaya = document.getElementById('reg-student-birthwilaya').value.trim();
+            studentBranch = document.getElementById('reg-student-branch').value;
+            studentSpec = document.getElementById('reg-student-spec').value;
+            
+            if (!studentBirthDate) {
+                showToast('يجب إدخال تاريخ الميلاد', 'error');
+                return;
+            }
+            if (!studentBirthPlace) {
+                showToast('يجب إدخال مكان الميلاد', 'error');
+                return;
+            }
+            if (!studentBirthWilaya) {
+                showToast('يجب إدخال ولاية الميلاد', 'error');
+                return;
+            }
+            if (!studentBranch) {
+                showToast('يجب اختيار الشعبة', 'error');
+                return;
+            }
+            if (!studentSpec) {
+                showToast('يجب اختيار التخصص', 'error');
+                return;
+            }
+        }
+        
+        // التحقق من عدم وجود المستخدم مسبقاً
+        const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+        const existingUser = users.find(u => u.fullName === fullName);
+        
+        if (existingUser) {
+            showToast('يوجد حساب مسجل بهذا الاسم مسبقاً', 'error');
+            return;
+        }
+        
+        // إنشاء المستخدم الجديد
+        const newUser = {
+            id: users.length + 1,
+            username: fullName, // اسم المستخدم هو الاسم الكامل
+            password: password,
+            fullName: fullName,
+            role: role,
+            roleAr: role === 'professor' ? 'أستاذ' : 'طالب',
+            title: role === 'professor' ? title : (studentId || 'طالب ماستر'),
+            permissions: role === 'professor' ? ['view', 'export'] : ['view'],
+            registrationStatus: 'pending', // الحالة: pending, approved, rejected
+            registeredAt: new Date().toISOString()
+        };
+        
+        // إضافة الحقول الخاصة بالأستاذ
+        if (role === 'professor') {
+            newUser.professorName = fullName;
+            newUser.birthDate = profBirthDate;
+            newUser.specialization = profSpec;
+        } else {
+            // إضافة الحقول الخاصة بالطالب
+            newUser.studentName = fullName;
+            newUser.birthDate = studentBirthDate;
+            newUser.birthPlace = studentBirthPlace;
+            newUser.birthWilaya = studentBirthWilaya;
+            newUser.branch = studentBranch;
+            newUser.specialization = studentSpec;
+        }
+        
+        // حفظ المستخدم
+        users.push(newUser);
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        
+        showToast('تم إرسال طلب التسجيل بنجاح! سيتم مراجعته من قبل نائب رئيس القسم', 'success');
+        
+        // إعادة تعيين النموذج
+        document.getElementById('register-form').reset();
+        
+        // الانتقال لصفحة تسجيل الدخول
+        setTimeout(() => {
+            showLoginPage();
+        }, 2000);
     
-    // التحقق من الاسم الكامل
-    const nameValidation = validateFullName(fullName);
-    if (!nameValidation.valid) {
-        showToast(nameValidation.message, 'error');
-        return;
+    } catch (error) {
+        console.error('خطأ في معالجة التسجيل:', error);
+        showToast('حدث خطأ أثناء التسجيل: ' + error.message, 'error');
     }
-    
-    // التحقق من تطابق كلمة المرور
-    if (password !== confirmPassword) {
-        showToast('كلمات المرور غير متطابقة', 'error');
-        return;
-    }
-    
-    // التحقق من طول كلمة المرور
-    if (password.length < 6) {
-        showToast('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
-        return;
-    }
-    
-    // التحقق من الرتبة للأستاذ
-    if (role === 'professor' && !title) {
-        showToast('يجب اختيار الرتبة العلمية', 'error');
-        return;
-    }
-    
-    // التحقق من عدم وجود المستخدم مسبقاً
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const existingUser = users.find(u => u.fullName === fullName);
-    
-    if (existingUser) {
-        showToast('يوجد حساب مسجل بهذا الاسم مسبقاً', 'error');
-        return;
-    }
-    
-    // إنشاء المستخدم الجديد
-    const newUser = {
-        id: users.length + 1,
-        username: fullName, // اسم المستخدم هو الاسم الكامل
-        password: password,
-        fullName: fullName,
-        role: role,
-        roleAr: role === 'professor' ? 'أستاذ' : 'طالب',
-        title: role === 'professor' ? title : (studentId || 'طالب ماستر'),
-        permissions: role === 'professor' ? ['view', 'export'] : ['view']
-    };
-    
-    // إضافة اسم الأستاذ أو الطالب للفلترة
-    if (role === 'professor') {
-        newUser.professorName = fullName;
-    } else {
-        newUser.studentName = fullName;
-    }
-    
-    // حفظ المستخدم
-    users.push(newUser);
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    
-    showToast('تم إنشاء الحساب بنجاح! يمكنك الآن تسجيل الدخول', 'success');
-    
-    // إعادة تعيين النموذج
-    document.getElementById('register-form').reset();
-    
-    // الانتقال لصفحة تسجيل الدخول
-    setTimeout(() => {
-        showLoginPage();
-        // ملء اسم المستخدم تلقائياً
-        document.getElementById('username').value = fullName;
-    }, 1500);
 }
 
 // ================================================
@@ -628,6 +844,263 @@ let editingThesisId = null;
 let currentPDFThesis = null;
 let previewData = null; // البيانات المراد معاينتها قبل الاستيراد
 let fromFormImport = false; // هل الاستيراد من صفحة النموذج
+
+// ================================================
+// تحميل البيانات عند بدء التشغيل
+// ================================================
+
+// ================================================
+// إدارة طلبات التسجيل
+// ================================================
+
+// أسباب رفض طلبات التسجيل
+const REJECTION_REASONS = [
+    'الطالب لا ينتمي لأي تخصص من تخصصات القسم',
+    'بيانات غير صحيحة أو ناقصة',
+    'الطالب غير مسجل في القسم',
+    'تخصص غير متوفر في القسم',
+    'معلومات شخصية غير مطابقة',
+    'سبب آخر'
+];
+
+// تحديث عداد طلبات التسجيل المعلقة
+function updatePendingRequestsCount() {
+    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const pendingCount = users.filter(u => u.registrationStatus === 'pending').length;
+    
+    const badge = document.getElementById('pending-count-badge');
+    if (badge) {
+        badge.textContent = pendingCount;
+        badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+    }
+}
+
+// عرض طلبات التسجيل
+function renderRegistrationRequests() {
+    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    
+    const pending = users.filter(u => u.registrationStatus === 'pending');
+    const approved = users.filter(u => u.registrationStatus === 'approved');
+    const rejected = users.filter(u => u.registrationStatus === 'rejected');
+    
+    // تحديث الإحصائيات
+    document.getElementById('reg-count-pending').textContent = pending.length;
+    document.getElementById('reg-count-approved').textContent = approved.length;
+    document.getElementById('reg-count-rejected').textContent = rejected.length;
+    
+    const container = document.getElementById('registration-requests-container');
+    if (!container) return;
+    
+    if (pending.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <h3>لا توجد طلبات معلقة</h3>
+                <p>جميع طلبات التسجيل تمت معالجتها</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '<div style="display:flex;flex-direction:column;gap:20px;">';
+    
+    pending.forEach(user => {
+        const isStudent = user.role === 'student';
+        const isProfessor = user.role === 'professor';
+        const registeredDate = user.registeredAt ? new Date(user.registeredAt).toLocaleDateString('ar-DZ') : 'غير محدد';
+        
+        html += `
+            <div class="card" style="padding:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:15px;">
+                    <div>
+                        <h3 style="margin:0 0 8px 0;color:var(--primary-color);">
+                            ${isStudent ? '🎓' : '👨‍🏫'} ${user.fullName}
+                        </h3>
+                        <span class="badge" style="background:${isStudent ? '#3498db' : '#e67e22'};color:white;padding:4px 12px;">
+                            ${user.roleAr}
+                        </span>
+                        ${user.title ? `<span class="badge" style="background:var(--gray-400);color:white;padding:4px 12px;margin-right:8px;">${user.title}</span>` : ''}
+                    </div>
+                    <div style="text-align:left;color:var(--gray-600);font-size:0.9rem;">
+                        <div>📅 ${registeredDate}</div>
+                    </div>
+                </div>
+                
+                <div class="info-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px;padding:15px;background:var(--gray-50);border-radius:8px;">
+        `;
+        
+        if (isStudent) {
+            html += `
+                    <div><strong>تاريخ الميلاد:</strong> ${user.birthDate || 'غير محدد'}</div>
+                    <div><strong>مكان الميلاد:</strong> ${user.birthPlace || 'غير محدد'}</div>
+                    <div><strong>ولاية الميلاد:</strong> ${user.birthWilaya || 'غير محدد'}</div>
+                    <div><strong>الشعبة:</strong> ${user.branch || 'غير محدد'}</div>
+                    <div><strong>التخصص:</strong> ${user.specialization || 'غير محدد'}</div>
+            `;
+        } else if (isProfessor) {
+            html += `
+                    <div><strong>تاريخ الميلاد:</strong> ${user.birthDate || 'غير محدد'}</div>
+                    <div><strong>التخصص:</strong> ${user.specialization || 'غير محدد'}</div>
+            `;
+        }
+        
+        html += `
+                </div>
+                
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <button onclick="approveRegistration(${user.id})" class="btn btn-success">
+                        ✅ الموافقة على الطلب
+                    </button>
+                    <button onclick="showRejectModal(${user.id})" class="btn btn-danger">
+                        ❌ رفض الطلب
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// الموافقة على طلب التسجيل
+function approveRegistration(userId) {
+    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const user = users.find(u => u.id === userId);
+    
+    if (!user) {
+        showToast('المستخدم غير موجود', 'error');
+        return;
+    }
+    
+    if (confirm(`هل أنت متأكد من الموافقة على طلب تسجيل "${user.fullName}"؟`)) {
+        user.registrationStatus = 'approved';
+        user.approvedAt = new Date().toISOString();
+        user.approvedBy = getCurrentUser().fullName;
+        
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        showToast(`✅ تم قبول طلب تسجيل ${user.fullName}`, 'success');
+        
+        updatePendingRequestsCount();
+        renderRegistrationRequests();
+    }
+}
+
+// إظهار نافذة رفض الطلب
+function showRejectModal(userId) {
+    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const user = users.find(u => u.id === userId);
+    
+    if (!user) {
+        showToast('المستخدم غير موجود', 'error');
+        return;
+    }
+    
+    let reasonsHtml = '';
+    REJECTION_REASONS.forEach((reason, index) => {
+        reasonsHtml += `
+            <label style="display:flex;align-items:start;gap:8px;padding:10px;border:1px solid var(--gray-300);border-radius:6px;cursor:pointer;transition:all 0.2s;">
+                <input type="radio" name="rejection-reason" value="${reason}" style="margin-top:3px;" ${index === 0 ? 'checked' : ''}>
+                <span style="flex:1;">${reason}</span>
+            </label>
+        `;
+    });
+    
+    const modal = document.createElement('div');
+    modal.id = 'reject-modal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+    modal.innerHTML = `
+        <div style="background:white;padding:30px;border-radius:12px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;">
+            <h3 style="margin:0 0 20px 0;color:var(--danger-color);">❌ رفض طلب التسجيل</h3>
+            <p style="margin-bottom:20px;color:var(--gray-700);">
+                <strong>المستخدم:</strong> ${user.fullName}<br>
+                <strong>الصفة:</strong> ${user.roleAr}
+            </p>
+            <div style="margin-bottom:20px;">
+                <label style="display:block;margin-bottom:10px;font-weight:600;color:var(--gray-700);">
+                    اختر سبب الرفض:
+                </label>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    ${reasonsHtml}
+                </div>
+            </div>
+            <div id="custom-reason-container" style="display:none;margin-bottom:20px;">
+                <label style="display:block;margin-bottom:8px;font-weight:600;color:var(--gray-700);">
+                    حدد السبب:
+                </label>
+                <textarea id="custom-reason-text" rows="3" style="width:100%;padding:10px;border:1px solid var(--gray-300);border-radius:6px;font-family:Cairo,sans-serif;"></textarea>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="closeRejectModal()" class="btn btn-secondary">إلغاء</button>
+                <button onclick="confirmRejectRegistration(${userId})" class="btn btn-danger">تأكيد الرفض</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // إظهار حقل السبب المخصص عند اختيار "سبب آخر"
+    const radios = modal.querySelectorAll('input[name="rejection-reason"]');
+    radios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            const customContainer = document.getElementById('custom-reason-container');
+            if (this.value === 'سبب آخر') {
+                customContainer.style.display = 'block';
+            } else {
+                customContainer.style.display = 'none';
+            }
+        });
+    });
+}
+
+// إغلاق نافذة الرفض
+function closeRejectModal() {
+    const modal = document.getElementById('reject-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// تأكيد رفض الطلب
+function confirmRejectRegistration(userId) {
+    const selectedReason = document.querySelector('input[name="rejection-reason"]:checked');
+    
+    if (!selectedReason) {
+        showToast('يرجى اختيار سبب الرفض', 'error');
+        return;
+    }
+    
+    let reason = selectedReason.value;
+    
+    if (reason === 'سبب آخر') {
+        const customReason = document.getElementById('custom-reason-text').value.trim();
+        if (!customReason) {
+            showToast('يرجى تحديد سبب الرفض', 'error');
+            return;
+        }
+        reason = customReason;
+    }
+    
+    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const user = users.find(u => u.id === userId);
+    
+    if (!user) {
+        showToast('المستخدم غير موجود', 'error');
+        return;
+    }
+    
+    user.registrationStatus = 'rejected';
+    user.rejectionReason = reason;
+    user.rejectedAt = new Date().toISOString();
+    user.rejectedBy = getCurrentUser().fullName;
+    
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    showToast(`❌ تم رفض طلب تسجيل ${user.fullName}`, 'error');
+    
+    closeRejectModal();
+    updatePendingRequestsCount();
+    renderRegistrationRequests();
+}
 
 // ================================================
 // تحميل البيانات عند بدء التشغيل
@@ -1064,6 +1537,9 @@ function showPage(pageId) {
             break;
         case 'approval':
             updateApprovalPage();
+            break;
+        case 'registration-requests':
+            renderRegistrationRequests();
             break;
         case 'add-thesis':
             if (editingThesisId) {
