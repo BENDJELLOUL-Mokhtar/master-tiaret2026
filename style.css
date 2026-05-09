@@ -3598,3 +3598,36 @@ tbody td {
     color: #555;
     line-height: 1.5;
 }
+
+/* أنماط التبويبات في صفحة طلبات التسجيل */
+.tab-button {
+    padding: 12px 24px;
+    background: var(--gray-100);
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--gray-600);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 0.95rem;
+}
+
+.tab-button:hover {
+    background: var(--gray-200);
+    color: var(--primary-color);
+}
+
+.tab-button.active {
+    background: white;
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.reg-tab-content {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

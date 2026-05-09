@@ -984,20 +984,48 @@ function renderRegistrationRequests() {
     const pendingStudents = pending.filter(u => u.role === 'student');
     const pendingProfessors = pending.filter(u => u.role === 'professor');
     
+    // تقسيم المعتمدين حسب الدور
+    const approvedStudents = approved.filter(u => u.role === 'student');
+    const approvedProfessors = approved.filter(u => u.role === 'professor');
+    
+    // تقسيم المرفوضين حسب الدور
+    const rejectedStudents = rejected.filter(u => u.role === 'student');
+    const rejectedProfessors = rejected.filter(u => u.role === 'professor');
+    
     // تحديث الإحصائيات
     document.getElementById('reg-count-pending').textContent = pending.length;
     document.getElementById('reg-count-approved').textContent = approved.length;
     document.getElementById('reg-count-rejected').textContent = rejected.length;
     
-    const container = document.getElementById('registration-requests-container');
+    // عرض الطلبات المعلقة
+    renderRegistrationByStatus('pending', pendingProfessors, pendingStudents, true);
+    
+    // عرض المعتمدين
+    renderRegistrationByStatus('approved', approvedProfessors, approvedStudents, false);
+    
+    // عرض المرفوضين
+    renderRegistrationByStatus('rejected', rejectedProfessors, rejectedStudents, false);
+}
+
+// دالة لعرض المستخدمين حسب الحالة
+function renderRegistrationByStatus(status, professors, students, showActions) {
+    const container = document.getElementById(`registration-${status}-container`);
     if (!container) return;
     
-    if (pending.length === 0) {
+    const totalCount = professors.length + students.length;
+    
+    if (totalCount === 0) {
+        const messages = {
+            pending: { icon: '📭', title: 'لا توجد طلبات معلقة', subtitle: 'جميع طلبات التسجيل تمت معالجتها' },
+            approved: { icon: '✅', title: 'لا يوجد مستخدمون معتمدون بعد', subtitle: 'لم تتم الموافقة على أي طلبات حتى الآن' },
+            rejected: { icon: '❌', title: 'لا يوجد طلبات مرفوضة', subtitle: 'لم يتم رفض أي طلبات حتى الآن' }
+        };
+        const msg = messages[status];
         container.innerHTML = `
             <div class="empty-state">
-                <div class="empty-icon">📭</div>
-                <h3>لا توجد طلبات معلقة</h3>
-                <p>جميع طلبات التسجيل تمت معالجتها</p>
+                <div class="empty-icon">${msg.icon}</div>
+                <h3>${msg.title}</h3>
+                <p>${msg.subtitle}</p>
             </div>
         `;
         return;
@@ -1005,35 +1033,35 @@ function renderRegistrationRequests() {
     
     let html = '';
     
-    // قسم طلبات الأساتذة
-    if (pendingProfessors.length > 0) {
+    // قسم الأساتذة
+    if (professors.length > 0) {
         html += `
             <div style="margin-bottom:30px;">
                 <h3 style="color:var(--primary-color);margin-bottom:15px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
-                    👨‍🏫 طلبات الأساتذة (${pendingProfessors.length})
+                    👨‍🏫 الأساتذة (${professors.length})
                 </h3>
                 <div style="display:flex;flex-direction:column;gap:20px;">
         `;
         
-        pendingProfessors.forEach(user => {
-            html += renderUserCard(user);
+        professors.forEach(user => {
+            html += renderUserCard(user, showActions, status);
         });
         
         html += '</div></div>';
     }
     
-    // قسم طلبات الطلبة
-    if (pendingStudents.length > 0) {
+    // قسم الطلبة
+    if (students.length > 0) {
         html += `
             <div style="margin-bottom:30px;">
                 <h3 style="color:#3498db;margin-bottom:15px;padding-bottom:10px;border-bottom:2px solid #3498db;">
-                    🎓 طلبات الطلبة (${pendingStudents.length})
+                    🎓 الطلبة (${students.length})
                 </h3>
                 <div style="display:flex;flex-direction:column;gap:20px;">
         `;
         
-        pendingStudents.forEach(user => {
-            html += renderUserCard(user);
+        students.forEach(user => {
+            html += renderUserCard(user, showActions, status);
         });
         
         html += '</div></div>';
@@ -1042,11 +1070,49 @@ function renderRegistrationRequests() {
     container.innerHTML = html;
 }
 
+// التبديل بين تبويبات التسجيل
+function showRegistrationTab(tabName) {
+    // إخفاء جميع التبويبات
+    document.querySelectorAll('.reg-tab-content').forEach(tab => {
+        tab.style.display = 'none';
+    });
+    
+    // إزالة الفئة النشطة من جميع الأزرار
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // إظهار التبويب المحدد
+    const selectedTab = document.getElementById(`registration-${tabName}-container`);
+    if (selectedTab) {
+        selectedTab.style.display = 'block';
+    }
+    
+    // تفعيل الزر المحدد
+    const selectedBtn = document.getElementById(`tab-${tabName}`);
+    if (selectedBtn) {
+        selectedBtn.classList.add('active');
+    }
+}
+
 // دالة مساعدة لعرض بطاقة المستخدم
-function renderUserCard(user) {
+function renderUserCard(user, showActions = true, status = 'pending') {
     const isStudent = user.role === 'student';
     const isProfessor = user.role === 'professor';
     const registeredDate = user.registeredAt ? new Date(user.registeredAt).toLocaleDateString('ar-DZ') : 'غير محدد';
+    
+    // معلومات إضافية حسب الحالة
+    let statusInfo = '';
+    if (status === 'approved' && user.approvedAt) {
+        const approvedDate = new Date(user.approvedAt).toLocaleDateString('ar-DZ');
+        statusInfo = `<div style="color:#27ae60;font-size:0.85rem;">✅ تمت الموافقة في ${approvedDate} بواسطة ${user.approvedBy || 'المسؤول'}</div>`;
+    } else if (status === 'rejected' && user.rejectedAt) {
+        const rejectedDate = new Date(user.rejectedAt).toLocaleDateString('ar-DZ');
+        statusInfo = `<div style="color:#e74c3c;font-size:0.85rem;">❌ تم الرفض في ${rejectedDate} بواسطة ${user.rejectedBy || 'المسؤول'}</div>`;
+        if (user.rejectionReason) {
+            statusInfo += `<div style="color:#e74c3c;font-size:0.85rem;margin-top:5px;"><strong>السبب:</strong> ${user.rejectionReason}</div>`;
+        }
+    }
     
     let html = `
         <div class="card" style="padding:20px;">
@@ -1062,6 +1128,7 @@ function renderUserCard(user) {
                 </div>
                 <div style="text-align:left;color:var(--gray-600);font-size:0.9rem;">
                     <div>📅 ${registeredDate}</div>
+                    ${statusInfo}
                 </div>
             </div>
             
@@ -1085,7 +1152,11 @@ function renderUserCard(user) {
     
     html += `
             </div>
-            
+    `;
+    
+    // إظهار الأزرار فقط للطلبات المعلقة
+    if (showActions) {
+        html += `
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
                 <button onclick="approveRegistration(${user.id})" class="btn btn-success">
                     ✅ الموافقة على الطلب
@@ -1094,6 +1165,10 @@ function renderUserCard(user) {
                     ❌ رفض الطلب
                 </button>
             </div>
+        `;
+    }
+    
+    html += `
         </div>
     `;
     

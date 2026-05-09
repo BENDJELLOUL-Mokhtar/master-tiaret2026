@@ -817,30 +817,56 @@
                 </div>
 
                 <div class="stats-grid" style="margin-bottom:20px;">
-                    <div class="stat-card warning">
+                    <div class="stat-card warning" style="cursor:pointer;" onclick="showRegistrationTab('pending')">
                         <div class="stat-icon">⏳</div>
                         <div class="stat-content">
                             <h3 id="reg-count-pending">0</h3>
                             <p>طلبات معلقة</p>
                         </div>
                     </div>
-                    <div class="stat-card success">
+                    <div class="stat-card success" style="cursor:pointer;" onclick="showRegistrationTab('approved')">
                         <div class="stat-icon">✅</div>
                         <div class="stat-content">
                             <h3 id="reg-count-approved">0</h3>
-                            <p>طلبات موافق عليها</p>
+                            <p>موافق عليها</p>
                         </div>
                     </div>
-                    <div class="stat-card danger">
+                    <div class="stat-card danger" style="cursor:pointer;" onclick="showRegistrationTab('rejected')">
                         <div class="stat-icon">❌</div>
                         <div class="stat-content">
                             <h3 id="reg-count-rejected">0</h3>
-                            <p>طلبات مرفوضة</p>
+                            <p>مرفوضة</p>
                         </div>
                     </div>
                 </div>
 
-                <div id="registration-requests-container">
+                <!-- التبويبات -->
+                <div style="margin-bottom:20px;border-bottom:2px solid var(--gray-300);">
+                    <div style="display:flex;gap:10px;">
+                        <button id="tab-pending" class="tab-button active" onclick="showRegistrationTab('pending')">
+                            ⏳ الطلبات المعلقة
+                        </button>
+                        <button id="tab-approved" class="tab-button" onclick="showRegistrationTab('approved')">
+                            ✅ المعتمدون
+                        </button>
+                        <button id="tab-rejected" class="tab-button" onclick="showRegistrationTab('rejected')">
+                            ❌ المرفوضون
+                        </button>
+                    </div>
+                </div>
+
+                <!-- محتوى الطلبات المعلقة -->
+                <div id="registration-pending-container" class="reg-tab-content">
+                    <!-- سيتم ملؤها ديناميكياً -->
+                </div>
+
+                <!-- محتوى المعتمدين -->
+                <div id="registration-approved-container" class="reg-tab-content" style="display:none;">
+                    <!-- سيتم ملؤها ديناميكياً -->
+                </div>
+
+                <!-- محتوى المرفوضين -->
+                <div id="registration-rejected-container" class="reg-tab-content" style="display:none;">
                     <!-- سيتم ملؤها ديناميكياً -->
                 </div>
             </div>
