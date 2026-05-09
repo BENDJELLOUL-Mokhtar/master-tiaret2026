@@ -293,6 +293,8 @@ function initializeUsers() {
             registrationStatus: 'approved'
         }));
         localStorage.setItem(USERS_KEY, JSON.stringify(usersWithStatus));
+        // محاولة تحميل بيانات المستخدمين من الملف المشترك
+        tryLoadUsersFromShared();
     } else {
         // تحديث المستخدمين الحاليين لإضافة حالة الموافقة إن لم تكن موجودة
         const users = JSON.parse(stored);
@@ -307,6 +309,101 @@ function initializeUsers() {
             localStorage.setItem(USERS_KEY, JSON.stringify(users));
         }
     }
+}
+
+// تحميل المستخدمين من ملف users-data.json على GitHub
+async function tryLoadUsersFromShared() {
+    try {
+        const res = await fetch('users-data.json?v=' + Date.now());
+        if (!res.ok) return;
+        const sharedUsers = await res.json();
+        if (Array.isArray(sharedUsers) && sharedUsers.length > 0) {
+            // دمج المستخدمين من الملف مع المستخدمين المحليين
+            const localUsers = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+            const mergedUsers = mergeUsers(localUsers, sharedUsers);
+            localStorage.setItem(USERS_KEY, JSON.stringify(mergedUsers));
+            console.log(`✅ تم تحميل ${sharedUsers.length} مستخدم من الملف المشترك`);
+        }
+    } catch (e) {
+        // لا يوجد ملف مشترك أو خطأ في الشبكة — تجاهل
+        console.log('لم يتم العثور على ملف المستخدمين المشترك');
+    }
+}
+
+// دمج المستخدمين (إضافة المستخدمين الجدد من الملف المشترك)
+function mergeUsers(localUsers, sharedUsers) {
+    const mergedMap = new Map();
+    
+    // إضافة المستخدمين المحليين
+    localUsers.forEach(user => {
+        mergedMap.set(user.username, user);
+    });
+    
+    // إضافة أو تحديث من المستخدمين المشتركين
+    sharedUsers.forEach(user => {
+        if (!mergedMap.has(user.username)) {
+            mergedMap.set(user.username, user);
+        } else {
+            // تحديث البيانات إذا كان المستخدم موجود
+            const existing = mergedMap.get(user.username);
+            // الاحتفاظ بالحالة المحلية ولكن تحديث البيانات الأخرى
+            mergedMap.set(user.username, {
+                ...user,
+                registrationStatus: existing.registrationStatus || user.registrationStatus
+            });
+        }
+    });
+    
+    return Array.from(mergedMap.values());
+}
+
+// مزامنة يدوية للمستخدمين من الملف المشترك
+async function syncUsersFromShared() {
+    try {
+        showToast('جاري مزامنة المستخدمين...', 'info');
+        const res = await fetch('users-data.json?v=' + Date.now());
+        if (!res.ok) {
+            showToast('لم يُعثر على ملف المستخدمين المشترك', 'error');
+            return;
+        }
+        const sharedUsers = await res.json();
+        if (Array.isArray(sharedUsers) && sharedUsers.length > 0) {
+            const localUsers = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+            const mergedUsers = mergeUsers(localUsers, sharedUsers);
+            localStorage.setItem(USERS_KEY, JSON.stringify(mergedUsers));
+            showToast(`✅ تمت مزامنة ${sharedUsers.length} مستخدم`, 'success');
+            // تحديث واجهة طلبات التسجيل إذا كانت مفتوحة
+            if (typeof updateRegistrationRequests === 'function') {
+                updateRegistrationRequests();
+            }
+        } else {
+            showToast('ملف المستخدمين فارغ', 'warning');
+        }
+    } catch (e) {
+        showToast('فشلت المزامنة: ' + e.message, 'error');
+    }
+}
+
+// تصدير المستخدمين الحاليين كملف JSON لرفعه على GitHub
+function exportUsersToFile() {
+    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    if (users.length === 0) {
+        showToast('لا توجد بيانات مستخدمين للتصدير', 'warning');
+        return;
+    }
+    
+    const json = JSON.stringify(users, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'users-data.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('✅ تم تصدير بيانات المستخدمين — قم برفع الملف على GitHub', 'success');
 }
 
 // تسجيل الدخول

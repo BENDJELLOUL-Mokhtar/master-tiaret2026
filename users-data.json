@@ -1,0 +1,59 @@
+﻿[
+  {
+    "id": 1,
+    "username": "admin",
+    "password": "admin123",
+    "fullName": "أ.د بن جلول مختار",
+    "role": "admin",
+    "roleAr": "مدير المنصة",
+    "title": "أستاذ اللسانيات العربية",
+    "permissions": ["view", "add", "edit", "delete", "export", "import", "statistics", "system"],
+    "registrationStatus": "approved"
+  },
+  {
+    "id": 2,
+    "username": "head",
+    "password": "head123",
+    "fullName": "أ.د احميدة مداني",
+    "role": "head",
+    "roleAr": "رئيس القسم",
+    "title": "رئيس قسم اللغة العربية وآدابها",
+    "permissions": ["view", "add", "edit", "delete", "export", "import", "statistics"],
+    "registrationStatus": "approved"
+  },
+  {
+    "id": 3,
+    "username": "deputy",
+    "password": "deputy123",
+    "fullName": "أ.د دبيح محمد",
+    "role": "deputy",
+    "roleAr": "نائب رئيس القسم",
+    "title": "نائب رئيس قسم اللغة العربية وآدابها",
+    "permissions": ["view", "add", "edit", "delete", "export", "import", "statistics"],
+    "registrationStatus": "approved"
+  },
+  {
+    "id": 12,
+    "username": "professor",
+    "password": "prof123",
+    "fullName": "د. محمد الطاهر بن عاشور",
+    "role": "professor",
+    "roleAr": "أستاذ",
+    "title": "أستاذ محاضر",
+    "permissions": ["view", "export"],
+    "professorName": "د. محمد الطاهر بن عاشور",
+    "registrationStatus": "approved"
+  },
+  {
+    "id": 13,
+    "username": "student",
+    "password": "student123",
+    "fullName": "أحمد بن محمد العربي",
+    "role": "student",
+    "roleAr": "طالب",
+    "title": "طالب ماستر",
+    "permissions": ["view"],
+    "studentName": "أحمد بن محمد العربي",
+    "registrationStatus": "approved"
+  }
+]

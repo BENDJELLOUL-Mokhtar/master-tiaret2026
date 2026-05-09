@@ -806,6 +806,14 @@
                 <div class="page-header">
                     <h2>👥 طلبات التسجيل المعلقة</h2>
                     <p class="subtitle">مراجعة والموافقة على طلبات التسجيل الجديدة</p>
+                    <div style="margin-top: 10px;">
+                        <button onclick="syncUsersFromShared()" class="btn btn-secondary" style="margin-left: 10px;">
+                            🔄 مزامنة المستخدمين من GitHub
+                        </button>
+                        <button onclick="exportUsersToFile()" class="btn btn-secondary">
+                            📥 تصدير المستخدمين لرفعهم على GitHub
+                        </button>
+                    </div>
                 </div>
 
                 <div class="stats-grid" style="margin-bottom:20px;">
