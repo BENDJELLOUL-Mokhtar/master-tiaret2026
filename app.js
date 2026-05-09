@@ -1788,8 +1788,8 @@ function syncStudentsFromTheses() {
     const extractedStudents = new Map(); // name -> thesis data
     
     theses.forEach(thesis => {
-        if (thesis.student && !existingNames.has(thesis.student)) {
-            extractedStudents.set(thesis.student, {
+        if (thesis.studentName && !existingNames.has(thesis.studentName)) {
+            extractedStudents.set(thesis.studentName, {
                 thesisTitle: thesis.title,
                 branch: thesis.branch,
                 specialization: thesis.specialization,
