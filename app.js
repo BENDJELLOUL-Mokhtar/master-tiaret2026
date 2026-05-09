@@ -980,6 +980,10 @@ function renderRegistrationRequests() {
     const approved = users.filter(u => u.registrationStatus === 'approved');
     const rejected = users.filter(u => u.registrationStatus === 'rejected');
     
+    // تقسيم الطلبات المعلقة حسب الدور
+    const pendingStudents = pending.filter(u => u.role === 'student');
+    const pendingProfessors = pending.filter(u => u.role === 'professor');
+    
     // تحديث الإحصائيات
     document.getElementById('reg-count-pending').textContent = pending.length;
     document.getElementById('reg-count-approved').textContent = approved.length;
@@ -999,65 +1003,101 @@ function renderRegistrationRequests() {
         return;
     }
     
-    let html = '<div style="display:flex;flex-direction:column;gap:20px;">';
+    let html = '';
     
-    pending.forEach(user => {
-        const isStudent = user.role === 'student';
-        const isProfessor = user.role === 'professor';
-        const registeredDate = user.registeredAt ? new Date(user.registeredAt).toLocaleDateString('ar-DZ') : 'غير محدد';
-        
+    // قسم طلبات الأساتذة
+    if (pendingProfessors.length > 0) {
         html += `
-            <div class="card" style="padding:20px;">
-                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:15px;">
-                    <div>
-                        <h3 style="margin:0 0 8px 0;color:var(--primary-color);">
-                            ${isStudent ? '🎓' : '👨‍🏫'} ${user.fullName}
-                        </h3>
-                        <span class="badge" style="background:${isStudent ? '#3498db' : '#e67e22'};color:white;padding:4px 12px;">
-                            ${user.roleAr}
-                        </span>
-                        ${user.title ? `<span class="badge" style="background:var(--gray-400);color:white;padding:4px 12px;margin-right:8px;">${user.title}</span>` : ''}
-                    </div>
-                    <div style="text-align:left;color:var(--gray-600);font-size:0.9rem;">
-                        <div>📅 ${registeredDate}</div>
-                    </div>
-                </div>
-                
-                <div class="info-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px;padding:15px;background:var(--gray-50);border-radius:8px;">
+            <div style="margin-bottom:30px;">
+                <h3 style="color:var(--primary-color);margin-bottom:15px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
+                    👨‍🏫 طلبات الأساتذة (${pendingProfessors.length})
+                </h3>
+                <div style="display:flex;flex-direction:column;gap:20px;">
         `;
         
-        if (isStudent) {
-            html += `
-                    <div><strong>تاريخ الميلاد:</strong> ${user.birthDate || 'غير محدد'}</div>
-                    <div><strong>مكان الميلاد:</strong> ${user.birthPlace || 'غير محدد'}</div>
-                    <div><strong>ولاية الميلاد:</strong> ${user.birthWilaya || 'غير محدد'}</div>
-                    <div><strong>الشعبة:</strong> ${user.branch || 'غير محدد'}</div>
-                    <div><strong>التخصص:</strong> ${user.specialization || 'غير محدد'}</div>
-            `;
-        } else if (isProfessor) {
-            html += `
-                    <div><strong>تاريخ الميلاد:</strong> ${user.birthDate || 'غير محدد'}</div>
-                    <div><strong>التخصص:</strong> ${user.specialization || 'غير محدد'}</div>
-            `;
-        }
+        pendingProfessors.forEach(user => {
+            html += renderUserCard(user);
+        });
         
+        html += '</div></div>';
+    }
+    
+    // قسم طلبات الطلبة
+    if (pendingStudents.length > 0) {
         html += `
+            <div style="margin-bottom:30px;">
+                <h3 style="color:#3498db;margin-bottom:15px;padding-bottom:10px;border-bottom:2px solid #3498db;">
+                    🎓 طلبات الطلبة (${pendingStudents.length})
+                </h3>
+                <div style="display:flex;flex-direction:column;gap:20px;">
+        `;
+        
+        pendingStudents.forEach(user => {
+            html += renderUserCard(user);
+        });
+        
+        html += '</div></div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+// دالة مساعدة لعرض بطاقة المستخدم
+function renderUserCard(user) {
+    const isStudent = user.role === 'student';
+    const isProfessor = user.role === 'professor';
+    const registeredDate = user.registeredAt ? new Date(user.registeredAt).toLocaleDateString('ar-DZ') : 'غير محدد';
+    
+    let html = `
+        <div class="card" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:15px;">
+                <div>
+                    <h3 style="margin:0 0 8px 0;color:var(--primary-color);">
+                        ${isStudent ? '🎓' : '👨‍🏫'} ${user.fullName}
+                    </h3>
+                    <span class="badge" style="background:${isStudent ? '#3498db' : '#e67e22'};color:white;padding:4px 12px;">
+                        ${user.roleAr}
+                    </span>
+                    ${user.title ? `<span class="badge" style="background:var(--gray-400);color:white;padding:4px 12px;margin-right:8px;">${user.title}</span>` : ''}
                 </div>
-                
-                <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                    <button onclick="approveRegistration(${user.id})" class="btn btn-success">
-                        ✅ الموافقة على الطلب
-                    </button>
-                    <button onclick="showRejectModal(${user.id})" class="btn btn-danger">
-                        ❌ رفض الطلب
-                    </button>
+                <div style="text-align:left;color:var(--gray-600);font-size:0.9rem;">
+                    <div>📅 ${registeredDate}</div>
                 </div>
             </div>
-        `;
-    });
+            
+            <div class="info-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px;padding:15px;background:var(--gray-50);border-radius:8px;">
+    `;
     
-    html += '</div>';
-    container.innerHTML = html;
+    if (isStudent) {
+        html += `
+                <div><strong>تاريخ الميلاد:</strong> ${user.birthDate || 'غير محدد'}</div>
+                <div><strong>مكان الميلاد:</strong> ${user.birthPlace || 'غير محدد'}</div>
+                <div><strong>ولاية الميلاد:</strong> ${user.birthWilaya || 'غير محدد'}</div>
+                <div><strong>الشعبة:</strong> ${user.branch || 'غير محدد'}</div>
+                <div><strong>التخصص:</strong> ${user.specialization || 'غير محدد'}</div>
+        `;
+    } else if (isProfessor) {
+        html += `
+                <div><strong>تاريخ الميلاد:</strong> ${user.birthDate || 'غير محدد'}</div>
+                <div><strong>التخصص:</strong> ${user.specialization || 'غير محدد'}</div>
+        `;
+    }
+    
+    html += `
+            </div>
+            
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button onclick="approveRegistration(${user.id})" class="btn btn-success">
+                    ✅ الموافقة على الطلب
+                </button>
+                <button onclick="showRejectModal(${user.id})" class="btn btn-danger">
+                    ❌ رفض الطلب
+                </button>
+            </div>
+        </div>
+    `;
+    
+    return html;
 }
 
 // الموافقة على طلب التسجيل
