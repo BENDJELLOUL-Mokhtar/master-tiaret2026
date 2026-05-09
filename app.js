@@ -1480,6 +1480,43 @@ function syncProfessorsFromTheses() {
     showToast(`✅ تم استخراج وإضافة ${addedCount} أستاذ جديد من المذكرات`, 'success');
 }
 
+// استخراج الأساتذة من طلبات التسجيل المعتمدة
+function syncProfessorsFromUsers() {
+    if (!confirm('سيتم استخراج جميع الأساتذة من طلبات التسجيل المعتمدة وإضافتهم تلقائياً.\nالأساتذة الموجودون مسبقاً لن يتأثروا.\nهل تريد المتابعة؟')) return;
+    
+    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const approvedProfessors = users.filter(u => u.role === 'professor' && u.registrationStatus === 'approved');
+    
+    if (approvedProfessors.length === 0) {
+        showToast('⚠️ لا يوجد أساتذة معتمدين في طلبات التسجيل', 'warning');
+        return;
+    }
+    
+    const professorsDB = loadProfessorsDatabase();
+    const existingNames = new Set(professorsDB.map(p => p.name));
+    
+    let addedCount = 0;
+    approvedProfessors.forEach(user => {
+        if (!existingNames.has(user.fullName)) {
+            const professorData = {
+                isAutoExtracted: true,
+                extractedFrom: 'registration',
+                rank: user.title || '',
+                specialization: user.specialization || '',
+                email: user.email || '',
+                phone: user.phone || '',
+                userId: user.id
+            };
+            professorsDB.push(createProfessor(user.fullName, professorData));
+            addedCount++;
+        }
+    });
+    
+    saveProfessorsDatabase(professorsDB);
+    updateProfessorsPage();
+    showToast(`✅ تم استخراج وإضافة ${addedCount} أستاذ جديد من طلبات التسجيل`, 'success');
+}
+
 // فتح نافذة إضافة أستاذ
 function openAddProfessorModal() {
     const modalHtml = `
@@ -1705,6 +1742,524 @@ function saveEditedProfessor() {
 }
 
 // ================================================
+// نظام إدارة الطلبة الكامل
+// ================================================
+
+const STUDENTS_DATA_KEY = 'students_database';
+
+function loadStudentsDatabase() {
+    const stored = localStorage.getItem(STUDENTS_DATA_KEY);
+    return stored ? JSON.parse(stored) : [];
+}
+
+function saveStudentsDatabase(studentsDB) {
+    localStorage.setItem(STUDENTS_DATA_KEY, JSON.stringify(studentsDB));
+}
+
+// إنشاء كائن طالب جديد
+function createStudent(name, additionalData = {}) {
+    return {
+        id: Date.now() + Math.random(),
+        name: name.trim(),
+        birthDate: additionalData.birthDate || '',
+        birthPlace: additionalData.birthPlace || '',
+        birthWilaya: additionalData.birthWilaya || '',
+        branch: additionalData.branch || '',
+        specialization: additionalData.specialization || '',
+        email: additionalData.email || '',
+        phone: additionalData.phone || '',
+        academicYear: additionalData.academicYear || '2025/2026',
+        thesisTitle: additionalData.thesisTitle || '',
+        supervisor: additionalData.supervisor || '',
+        notes: additionalData.notes || '',
+        userId: additionalData.userId || null,
+        isAutoExtracted: additionalData.isAutoExtracted || false,
+        extractedFrom: additionalData.extractedFrom || '',
+        createdAt: new Date().toISOString()
+    };
+}
+
+// استخراج الطلبة من المذكرات
+function syncStudentsFromTheses() {
+    if (!confirm('سيتم استخراج أسماء جميع الطلبة من المذكرات وإضافتهم تلقائياً.\nالطلبة الموجودون مسبقاً لن يتأثروا.\nهل تريد المتابعة؟')) return;
+    
+    const studentsDB = loadStudentsDatabase();
+    const existingNames = new Set(studentsDB.map(s => s.name));
+    const extractedStudents = new Map(); // name -> thesis data
+    
+    theses.forEach(thesis => {
+        if (thesis.student && !existingNames.has(thesis.student)) {
+            extractedStudents.set(thesis.student, {
+                thesisTitle: thesis.title,
+                branch: thesis.branch,
+                specialization: thesis.specialization,
+                supervisor: thesis.supervisor
+            });
+        }
+    });
+    
+    let addedCount = 0;
+    extractedStudents.forEach((data, name) => {
+        studentsDB.push(createStudent(name, { 
+            isAutoExtracted: true,
+            extractedFrom: 'theses',
+            ...data
+        }));
+        addedCount++;
+    });
+    
+    saveStudentsDatabase(studentsDB);
+    updateStudentsPage();
+    showToast(`✅ تم استخراج وإضافة ${addedCount} طالب جديد من المذكرات`, 'success');
+}
+
+// استخراج الطلبة من طلبات التسجيل المعتمدة
+function syncStudentsFromUsers() {
+    if (!confirm('سيتم استخراج جميع الطلبة من طلبات التسجيل المعتمدة وإضافتهم تلقائياً.\nالطلبة الموجودون مسبقاً لن يتأثروا.\nهل تريد المتابعة؟')) return;
+    
+    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const approvedStudents = users.filter(u => u.role === 'student' && u.registrationStatus === 'approved');
+    
+    if (approvedStudents.length === 0) {
+        showToast('⚠️ لا يوجد طلبة معتمدين في طلبات التسجيل', 'warning');
+        return;
+    }
+    
+    const studentsDB = loadStudentsDatabase();
+    const existingNames = new Set(studentsDB.map(s => s.name));
+    
+    let addedCount = 0;
+    approvedStudents.forEach(user => {
+        if (!existingNames.has(user.fullName)) {
+            const studentData = {
+                isAutoExtracted: true,
+                extractedFrom: 'registration',
+                birthDate: user.birthDate || '',
+                birthPlace: user.birthPlace || '',
+                birthWilaya: user.birthWilaya || '',
+                branch: user.branch || '',
+                specialization: user.specialization || '',
+                email: user.email || '',
+                phone: user.phone || '',
+                userId: user.id
+            };
+            studentsDB.push(createStudent(user.fullName, studentData));
+            addedCount++;
+        }
+    });
+    
+    saveStudentsDatabase(studentsDB);
+    updateStudentsPage();
+    showToast(`✅ تم استخراج وإضافة ${addedCount} طالب جديد من طلبات التسجيل`, 'success');
+}
+
+// تحديث صفحة الطلبة
+function updateStudentsPage() {
+    const studentsDB = loadStudentsDatabase();
+    
+    // إحصائيات الطلبة
+    const totalStudents = studentsDB.length;
+    const byBranch = {};
+    const bySpecialization = {};
+    
+    studentsDB.forEach(student => {
+        if (student.branch) {
+            byBranch[student.branch] = (byBranch[student.branch] || 0) + 1;
+        }
+        if (student.specialization) {
+            bySpecialization[student.specialization] = (bySpecialization[student.specialization] || 0) + 1;
+        }
+    });
+    
+    // عرض بطاقات الإحصائيات
+    const summaryContainer = document.getElementById('students-summary-cards');
+    if (summaryContainer) {
+        let html = `
+            <div class="stat-card">
+                <div class="stat-icon">🎓</div>
+                <div class="stat-info">
+                    <h3 class="stat-value">${totalStudents}</h3>
+                    <p class="stat-label">إجمالي الطلبة</p>
+                </div>
+            </div>
+        `;
+        
+        Object.entries(byBranch).forEach(([branch, count]) => {
+            html += `
+                <div class="stat-card">
+                    <div class="stat-icon">📚</div>
+                    <div class="stat-info">
+                        <h3 class="stat-value">${count}</h3>
+                        <p class="stat-label">${branch}</p>
+                    </div>
+                </div>
+            `;
+        });
+        
+        summaryContainer.innerHTML = html;
+    }
+    
+    // عرض جدول الطلبة
+    const tableContainer = document.getElementById('students-table-container');
+    if (!tableContainer) return;
+    
+    if (studentsDB.length === 0) {
+        tableContainer.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">🎓</div>
+                <h3>لا يوجد طلبة</h3>
+                <p>ابدأ بإضافة الطلبة أو استخراجهم من المذكرات أو طلبات التسجيل</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>الاسم الكامل</th>
+                        <th>الشعبة</th>
+                        <th>التخصص</th>
+                        <th>عنوان المذكرة</th>
+                        <th>الأستاذ المشرف</th>
+                        <th>البريد الإلكتروني</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    studentsDB.forEach(student => {
+        html += `
+            <tr>
+                <td><strong>${student.name}</strong></td>
+                <td>${student.branch || '-'}</td>
+                <td>${student.specialization || '-'}</td>
+                <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${student.thesisTitle || '-'}</td>
+                <td>${student.supervisor || '-'}</td>
+                <td>${student.email || '-'}</td>
+                <td>
+                    <button onclick="editStudent(${student.id})" class="btn btn-sm btn-info" title="تعديل">✏️</button>
+                    <button onclick="deleteStudent(${student.id})" class="btn btn-sm btn-danger" title="حذف">🗑️</button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    tableContainer.innerHTML = html;
+}
+
+// فتح نافذة إضافة طالب
+function openAddStudentModal() {
+    const modalHtml = `
+        <div class="modal-overlay" id="add-student-modal" onclick="if(event.target.id==='add-student-modal')closeAddStudentModal()">
+            <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header">
+                    <h3>➕ إضافة طالب جديد</h3>
+                    <button onclick="closeAddStudentModal()" class="modal-close">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label><strong>الاسم الكامل: *</strong></label>
+                        <input type="text" id="student-name" placeholder="مثال: أحمد بن محمد العربي" required 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                        <div class="form-group">
+                            <label><strong>تاريخ الميلاد:</strong></label>
+                            <input type="date" id="student-birthdate" 
+                                   style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                        </div>
+                        <div class="form-group">
+                            <label><strong>مكان الميلاد:</strong></label>
+                            <input type="text" id="student-birthplace" placeholder="مثال: تيارت" 
+                                   style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><strong>ولاية الميلاد:</strong></label>
+                        <input type="text" id="student-birthwilaya" placeholder="مثال: تيارت" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                        <div class="form-group">
+                            <label><strong>الشعبة:</strong></label>
+                            <select id="student-branch" style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                                <option value="">اختر الشعبة</option>
+                                <option value="دراسات لغوية">دراسات لغوية</option>
+                                <option value="دراسات أدبية">دراسات أدبية</option>
+                                <option value="دراسات نقدية">دراسات نقدية</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label><strong>التخصص:</strong></label>
+                            <select id="student-specialization" style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                                <option value="">اختر التخصص</option>
+                                <option value="لسانيات الخطاب">لسانيات الخطاب</option>
+                                <option value="تعليمية اللغات">تعليمية اللغات</option>
+                                <option value="أدب حديث ومعاصر">أدب حديث ومعاصر</option>
+                                <option value="نقد حديث ومعاصر">نقد حديث ومعاصر</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><strong>عنوان المذكرة:</strong></label>
+                        <input type="text" id="student-thesis" placeholder="عنوان المذكرة إن وجد" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><strong>الأستاذ المشرف:</strong></label>
+                        <input type="text" id="student-supervisor" placeholder="اسم الأستاذ المشرف" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                        <div class="form-group">
+                            <label><strong>البريد الإلكتروني:</strong></label>
+                            <input type="email" id="student-email" placeholder="student@example.com" 
+                                   style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                        </div>
+                        <div class="form-group">
+                            <label><strong>رقم الهاتف:</strong></label>
+                            <input type="tel" id="student-phone" placeholder="0555123456" 
+                                   style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><strong>ملاحظات:</strong></label>
+                        <textarea id="student-notes" rows="3" placeholder="أي ملاحظات إضافية"
+                                  style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem; resize: vertical;"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="saveNewStudent()" class="btn btn-primary">💾 حفظ الطالب</button>
+                    <button onclick="closeAddStudentModal()" class="btn btn-secondary">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeAddStudentModal() {
+    const modal = document.getElementById('add-student-modal');
+    if (modal) modal.remove();
+}
+
+function saveNewStudent() {
+    const name = document.getElementById('student-name').value.trim();
+    
+    if (!name) {
+        showToast('⚠️ يرجى إدخال اسم الطالب', 'warning');
+        return;
+    }
+    
+    const studentData = {
+        birthDate: document.getElementById('student-birthdate').value,
+        birthPlace: document.getElementById('student-birthplace').value,
+        birthWilaya: document.getElementById('student-birthwilaya').value,
+        branch: document.getElementById('student-branch').value,
+        specialization: document.getElementById('student-specialization').value,
+        thesisTitle: document.getElementById('student-thesis').value,
+        supervisor: document.getElementById('student-supervisor').value,
+        email: document.getElementById('student-email').value,
+        phone: document.getElementById('student-phone').value,
+        notes: document.getElementById('student-notes').value
+    };
+    
+    const studentsDB = loadStudentsDatabase();
+    studentsDB.push(createStudent(name, studentData));
+    saveStudentsDatabase(studentsDB);
+    
+    closeAddStudentModal();
+    updateStudentsPage();
+    showToast('✅ تم إضافة الطالب بنجاح', 'success');
+}
+
+// تصدير بيانات الطلبة
+function exportStudentsData() {
+    const studentsDB = loadStudentsDatabase();
+    if (studentsDB.length === 0) {
+        showToast('لا توجد بيانات لتصديرها', 'warning');
+        return;
+    }
+    
+    const json = JSON.stringify(studentsDB, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `students_data_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`📥 تم تصدير بيانات ${studentsDB.length} طالب`, 'success');
+}
+
+// حذف طالب
+function deleteStudent(studentId) {
+    if (!confirm('هل تريد حذف هذا الطالب؟')) return;
+    
+    let studentsDB = loadStudentsDatabase();
+    studentsDB = studentsDB.filter(s => s.id !== studentId);
+    saveStudentsDatabase(studentsDB);
+    updateStudentsPage();
+    showToast('تم حذف الطالب', 'info');
+}
+
+// تعديل بيانات طالب
+function editStudent(studentId) {
+    const studentsDB = loadStudentsDatabase();
+    const student = studentsDB.find(s => s.id === studentId);
+    if (!student) return;
+    
+    const modalHtml = `
+        <div class="modal-overlay" id="edit-student-modal" onclick="if(event.target.id==='edit-student-modal')closeEditStudentModal()">
+            <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header">
+                    <h3>✏️ تعديل بيانات الطالب</h3>
+                    <button onclick="closeEditStudentModal()" class="modal-close">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label><strong>الاسم الكامل: *</strong></label>
+                        <input type="text" id="edit-student-name" value="${student.name}" required 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                        <div class="form-group">
+                            <label><strong>تاريخ الميلاد:</strong></label>
+                            <input type="date" id="edit-student-birthdate" value="${student.birthDate || ''}" 
+                                   style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                        </div>
+                        <div class="form-group">
+                            <label><strong>مكان الميلاد:</strong></label>
+                            <input type="text" id="edit-student-birthplace" value="${student.birthPlace || ''}" 
+                                   style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><strong>ولاية الميلاد:</strong></label>
+                        <input type="text" id="edit-student-birthwilaya" value="${student.birthWilaya || ''}" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                        <div class="form-group">
+                            <label><strong>الشعبة:</strong></label>
+                            <select id="edit-student-branch" style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                                <option value="">اختر الشعبة</option>
+                                <option value="دراسات لغوية" ${student.branch === 'دراسات لغوية' ? 'selected' : ''}>دراسات لغوية</option>
+                                <option value="دراسات أدبية" ${student.branch === 'دراسات أدبية' ? 'selected' : ''}>دراسات أدبية</option>
+                                <option value="دراسات نقدية" ${student.branch === 'دراسات نقدية' ? 'selected' : ''}>دراسات نقدية</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label><strong>التخصص:</strong></label>
+                            <select id="edit-student-specialization" style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                                <option value="">اختر التخصص</option>
+                                <option value="لسانيات الخطاب" ${student.specialization === 'لسانيات الخطاب' ? 'selected' : ''}>لسانيات الخطاب</option>
+                                <option value="تعليمية اللغات" ${student.specialization === 'تعليمية اللغات' ? 'selected' : ''}>تعليمية اللغات</option>
+                                <option value="أدب حديث ومعاصر" ${student.specialization === 'أدب حديث ومعاصر' ? 'selected' : ''}>أدب حديث ومعاصر</option>
+                                <option value="نقد حديث ومعاصر" ${student.specialization === 'نقد حديث ومعاصر' ? 'selected' : ''}>نقد حديث ومعاصر</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><strong>عنوان المذكرة:</strong></label>
+                        <input type="text" id="edit-student-thesis" value="${student.thesisTitle || ''}" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><strong>الأستاذ المشرف:</strong></label>
+                        <input type="text" id="edit-student-supervisor" value="${student.supervisor || ''}" 
+                               style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                        <div class="form-group">
+                            <label><strong>البريد الإلكتروني:</strong></label>
+                            <input type="email" id="edit-student-email" value="${student.email || ''}" 
+                                   style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                        </div>
+                        <div class="form-group">
+                            <label><strong>رقم الهاتف:</strong></label>
+                            <input type="tel" id="edit-student-phone" value="${student.phone || ''}" 
+                                   style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem;">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><strong>ملاحظات:</strong></label>
+                        <textarea id="edit-student-notes" rows="3"
+                                  style="width:100%; padding:10px; border:2px solid #ddd; border-radius:8px; font-family:Cairo,sans-serif; font-size:1rem; resize: vertical;">${student.notes || ''}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="saveEditedStudent(${studentId})" class="btn btn-primary">💾 حفظ التعديلات</button>
+                    <button onclick="closeEditStudentModal()" class="btn btn-secondary">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeEditStudentModal() {
+    const modal = document.getElementById('edit-student-modal');
+    if (modal) modal.remove();
+}
+
+function saveEditedStudent(studentId) {
+    const name = document.getElementById('edit-student-name').value.trim();
+    
+    if (!name) {
+        showToast('⚠️ يرجى إدخال اسم الطالب', 'warning');
+        return;
+    }
+    
+    const studentsDB = loadStudentsDatabase();
+    const student = studentsDB.find(s => s.id === studentId);
+    if (!student) return;
+    
+    student.name = name;
+    student.birthDate = document.getElementById('edit-student-birthdate').value;
+    student.birthPlace = document.getElementById('edit-student-birthplace').value;
+    student.birthWilaya = document.getElementById('edit-student-birthwilaya').value;
+    student.branch = document.getElementById('edit-student-branch').value;
+    student.specialization = document.getElementById('edit-student-specialization').value;
+    student.thesisTitle = document.getElementById('edit-student-thesis').value;
+    student.supervisor = document.getElementById('edit-student-supervisor').value;
+    student.email = document.getElementById('edit-student-email').value;
+    student.phone = document.getElementById('edit-student-phone').value;
+    student.notes = document.getElementById('edit-student-notes').value;
+    
+    saveStudentsDatabase(studentsDB);
+    closeEditStudentModal();
+    updateStudentsPage();
+    showToast('✅ تم تحديث بيانات الطالب', 'success');
+}
+
+// ================================================
 // التنقل بين الصفحات
 // ================================================
 
@@ -1740,6 +2295,9 @@ function showPage(pageId) {
             break;
         case 'professors':
             updateProfessorsPage();
+            break;
+        case 'students':
+            updateStudentsPage();
             break;
         case 'statistics':
             updateStatisticsPage();

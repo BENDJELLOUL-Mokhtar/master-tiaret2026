@@ -262,6 +262,10 @@
                     <span class="icon">👨‍🏫</span>
                     <span>الأساتذة</span>
                 </a>
+                <a href="#" onclick="showPage('students')" class="nav-item" data-page="students">
+                    <span class="icon">🎓</span>
+                    <span>الطلبة</span>
+                </a>
                 <a href="#" onclick="showPage('statistics')" class="nav-item" data-page="statistics">
                     <span class="icon">📈</span>
                     <span>الإحصائيات</span>
@@ -692,9 +696,10 @@
                 <div class="page-header">
                     <h2>📚 إدارة الأساتذة</h2>
                     <p class="subtitle">قاعدة بيانات الأساتذة ومشاركاتهم في لجان المناقشة</p>
-                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
                         <button onclick="openAddProfessorModal()" class="btn btn-primary">➕ إضافة أستاذ جديد</button>
-                        <button onclick="syncProfessorsFromTheses()" class="btn btn-secondary">🔄 استخراج الأساتذة من المذكرات</button>
+                        <button onclick="syncProfessorsFromTheses()" class="btn btn-secondary">🔄 استخراج من المذكرات</button>
+                        <button onclick="syncProfessorsFromUsers()" class="btn btn-secondary">👥 استخراج من طلبات التسجيل</button>
                         <button onclick="exportProfessorsData()" class="btn btn-info">📥 تصدير البيانات</button>
                     </div>
                 </div>
@@ -704,6 +709,26 @@
 
                 <!-- جدول الأساتذة -->
                 <div id="professors-table-container"></div>
+            </div>
+
+            <!-- صفحة الطلبة -->
+            <div id="students" class="page">
+                <div class="page-header">
+                    <h2>🎓 إدارة الطلبة</h2>
+                    <p class="subtitle">قاعدة بيانات الطلبة المسجلين في برنامج الماستر</p>
+                    <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
+                        <button onclick="openAddStudentModal()" class="btn btn-primary">➕ إضافة طالب جديد</button>
+                        <button onclick="syncStudentsFromTheses()" class="btn btn-secondary">🔄 استخراج من المذكرات</button>
+                        <button onclick="syncStudentsFromUsers()" class="btn btn-secondary">👥 استخراج من طلبات التسجيل</button>
+                        <button onclick="exportStudentsData()" class="btn btn-info">📥 تصدير البيانات</button>
+                    </div>
+                </div>
+
+                <!-- بطاقات الملخص -->
+                <div id="students-summary-cards" class="stats-grid" style="margin-bottom: 24px;"></div>
+
+                <!-- جدول الطلبة -->
+                <div id="students-table-container"></div>
             </div>
 
             <!-- صفحة الإحصائيات -->
